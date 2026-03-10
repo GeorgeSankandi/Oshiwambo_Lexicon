@@ -27,40 +27,33 @@ st.markdown("""
     .prediction-box { background-color: #FFF5F5; border-left-color: #C53030; }
     .prediction-text { color: #9B2C2C !important; }
     
-    /* PowerShell Terminal Styling */
+    /* WINDOWS POWERSHELL THEME */
     .terminal-container { 
-        background-color: #012456; 
-        color: #EEEDF0; 
-        font-family: Consolas, 'Lucida Console', monospace; 
+        background-color: #012456; /* Exact Windows PowerShell Blue */
+        color: #CCCCCC; /* Classic off-white terminal text */
+        font-family: 'Consolas', 'Courier New', monospace; 
         padding: 15px; 
+        border-radius: 2px;
+        border: 1px solid #000000;
         white-space: pre-wrap;
-        font-size: 14px;
-        line-height: 1.4;
-        border-top: 25px solid #EAEAEA;
-        border-left: 2px solid #0058b6;
-        border-right: 2px solid #0058b6;
-        border-bottom: 2px solid #0058b6;
-        border-radius: 4px;
-        box-shadow: 4px 4px 10px rgba(0,0,0,0.3);
-        position: relative;
-        margin-bottom: 25px;
+        margin-bottom: 20px;
+        line-height: 1.6;
+        font-size: 0.95rem;
+        box-shadow: 3px 3px 10px rgba(0,0,0,0.3);
     }
-    .terminal-container::before {
-        content: "▶ Terminal Output";
-        position: absolute;
-        top: -22px;
-        left: 5px;
-        color: #333;
-        font-family: 'Segoe UI', Tahoma, sans-serif;
-        font-size: 12px;
-        font-weight: 600;
+    .ps-prompt {
+        color: #EEEC7D; /* Classic PowerShell prompt yellow */
+        font-weight: bold;
+    }
+    .ps-text {
+        color: #FFFFFF;
     }
     </style>
     """, unsafe_allow_html=True)
 
 # 2. NAVIGATION SIDEBAR
 st.sidebar.title("🗂️ System Navigation")
-page = st.sidebar.radio("Select View:",["Diagnostic Tool", "Full Dataset Viewer"])
+page = st.sidebar.radio("Select View:", ["Diagnostic Tool", "Full Dataset Viewer"])
 st.sidebar.markdown("---")
 
 st.sidebar.subheader("📊 Empirical Evaluation Metrics")
@@ -75,7 +68,7 @@ st.sidebar.markdown("""
 
 with st.sidebar.expander("Linguistic Morphology Rules"):
     st.caption("Based on Zimmermann (1998), Uushona (2019), and Ndume (2020)")
-    st.write("**Prefixes:** omu-, ova-, oshi-, oka-, otshi-, aa-, pu-, ku-, mu- etc.")
+    st.write("**Prefixes:** omu-, ova-, oshi-, oka-, otshi-, aa-, pu-, ku-, mu-, sha- etc.")
     st.write("**Verbal Extensions (Suffixes):**")
     st.write("- **Passive:** -wa | **Applied:** -ela/-ila")
     st.write("- **Causative:** -ifa | **Reciprocal:** -afana")
@@ -101,9 +94,35 @@ def load_full_csv():
         return df
     return None
 
-# Centralized morphological lists to ensure consistency between extraction and reconstruction
-PREFIXES = sorted(['omalu', 'omaku', 'otshi', 'otava', 'otaka', 'otashi', 'ohandi', 'okwa', 'omu', 'ova', 'omi', 'oma', 'olu', 'oka', 'oku', 'aba', 'oya', 'ota', 'oo', 'ee', 'oi', 'ou', 'uu', 'aa', 'me', 'ko', 'po', 'mu', 'shi', 'e', 'o', 'a', 'i'], key=len, reverse=True)
+# Centralized morphological lists
+PREFIXES = sorted(['omalu', 'omaku', 'otshi', 'otava', 'otaka', 'otashi', 'ohandi', 'okwa', 'omu', 'ova', 'omi', 'oma', 'olu', 'oka', 'oku', 'aba', 'oya', 'ota', 'oo', 'ee', 'oi', 'ou', 'uu', 'aa', 'me', 'ko', 'po', 'mu', 'shi', 'sha', 'e', 'o', 'a', 'i'], key=len, reverse=True)
 SUFFIXES = sorted(['ululwa', 'shakati', 'enena', 'inina', 'elela', 'ilila', 'ulula', 'olola', 'onona', 'ununa', 'afana', 'mweno', 'kulu', 'gona', 'thana', 'thani', 'elwa', 'elwi', 'thwa', 'thwi', 'elel', 'ena', 'eni', 'uka', 'oka', 'wa', 'po', 'ko', 'mo', 'nge', 'ith', 'ik', 'ek', 'el', 'il'], key=len, reverse=True)
+
+def analyze_compound_word(word):
+    """
+    Detects Oshiwambo words that consist of multiple smaller words glued together.
+    """
+    word = str(word).lower().strip()
+    subject_prefixes = sorted(['shaa', 'sha', 'oshi', 'oka', 'omu', 'otshi', 'aa', 'ee', 'uu', 'ou', 'oma', 'omi'], key=len, reverse=True)
+    bridges = sorted(['kwa', 'ko', 'mo', 'po', 'na', 'ya', 'wa', 'ka', 'lwa'], key=len, reverse=True)
+    
+    for p in subject_prefixes:
+        if word.startswith(p):
+            remainder = word[len(p):]
+            for b in bridges:
+                b_idx = remainder.find(b)
+                if b_idx >= 3 and b_idx <= len(remainder) - len(b) - 3:
+                    verb_part = remainder[:b_idx]
+                    noun_part = remainder[b_idx + len(b):]
+                    return {
+                        "is_compound": True,
+                        "subject_prefix": p,
+                        "verb_component": verb_part,
+                        "bridge": b,
+                        "noun_component": noun_part,
+                        "format": f"{p}-{verb_part}-{b}-{noun_part}"
+                    }
+    return {"is_compound": False}
 
 def extract_oshiwambo_root(word):
     stem = str(word).lower().strip()
@@ -117,9 +136,18 @@ def extract_oshiwambo_root(word):
     return stem
 
 def get_cnn_input_signatures(word):
+    """
+    Prioritizes isolated components for Descriptive Neologisms to prevent Jaccard dilution.
+    """
     sigs = set()
-    root_form = extract_oshiwambo_root(word)
-    for term in[word, root_form]:
+    compound_data = analyze_compound_word(word)
+    
+    if compound_data.get("is_compound"):
+        terms = [compound_data["verb_component"], compound_data["noun_component"]]
+    else:
+        terms =[word, extract_oshiwambo_root(word)]
+        
+    for term in terms:
         if len(term) <= 5: sigs.add(term)
         for n in (3, 4, 5):
             for i in range(len(term) - n + 1):
@@ -127,21 +155,14 @@ def get_cnn_input_signatures(word):
     return sigs
 
 def reconstruct_morphology(user_root, reference_match_word):
-    """
-    Reconstructs a word using the User's Input Root but applies the 
-    Prefix and Suffix found in the matched reference word.
-    """
     ref_stem = str(reference_match_word).lower().strip()
-    
-    # Detect Prefix in Reference Match
     found_prefix = ""
     for pref in PREFIXES:
         if ref_stem.startswith(pref) and len(ref_stem) > len(pref) + 2:
             found_prefix = pref
-            ref_stem = ref_stem[len(pref):] # temporarily strip to look for suffix
+            ref_stem = ref_stem[len(pref):] 
             break
             
-    # Detect Suffix in Reference Match
     found_suffix = ""
     ref_stem_full = str(reference_match_word).lower().strip()
     for suff in SUFFIXES:
@@ -152,18 +173,13 @@ def reconstruct_morphology(user_root, reference_match_word):
     return f"{found_prefix}{user_root}{found_suffix}"
 
 def simulate_terminal(logs):
-    """
-    Simulates a real-time console/terminal output styled precisely as a 
-    Windows PowerShell terminal block.
-    """
     terminal_placeholder = st.empty()
-    current_text = "Output.\n\n"
+    current_text = ""
     for log in logs:
-        # Strip the generic '>' so we can seamlessly replace it with the PowerShell directory path
-        clean_log = log.lstrip('> ')
-        current_text += f"PS C:\\Oshiwambo_NLP> {clean_log}\n"
+        # Authentic Windows PowerShell formatting
+        current_text += f"<span class='ps-prompt'>PS C:\\Oshiwambo_NLP&gt;</span> <span class='ps-text'>{log}</span><br>"
         terminal_placeholder.markdown(f'<div class="terminal-container">{current_text}</div>', unsafe_allow_html=True)
-        time.sleep(0.35) # Delay to create a real-time typing effect
+        time.sleep(0.35) 
     time.sleep(0.5)
 
 # ---------------------------------------------------------
@@ -178,33 +194,63 @@ if page == "Diagnostic Tool":
     model = load_model()
     if model:
         user_input = st.text_input("Enter a dialect token, phrase, or base root (Fuzzy Matching & Grammar Stemming Active):", 
-                                  placeholder="e.g. 'okutondoka', 'oshikumbafa', 'omukwateleli'...").strip().lower()
+                                  placeholder="e.g. 'shaningwakomuntu', 'okutondoka', 'oshikumbafa'...").strip().lower()
 
         if user_input:
+            compound_data = analyze_compound_word(user_input)
             exact_matches =[entry for entry in model if entry['word'] == user_input or entry['root'].lower() == user_input]
             
+            terminal_logs =[
+                f"Initializing stream for input: '{user_input}'",
+                "Normalizing and cleaning text..."
+            ]
+            
+            if compound_data["is_compound"]:
+                terminal_logs.extend([
+                    "Analyzing morphological structure for potential neologism...",
+                    "Compound pattern detected: multiple Oshiwambo words glued together.",
+                    f"Deconstructed format: {compound_data['format']}"
+                ])
+                
             if exact_matches:
-                # --- STANDARD PATH FOR KNOWN WORDS ---
                 best_match = exact_matches[0]
-                origin = best_match['root']
                 identified_morpheme = best_match.get('extracted_root')
+                terminal_logs.extend([
+                    "Applying standard morphological rules (Zimmermann, Uushona, Ndume)...",
+                    f"Extracted base root: '{identified_morpheme}'",
+                    "Querying Hybrid CNN-LSTM-SVM architecture...",
+                    f"SVM exact match located. Scaled weight: {best_match['scaled_weight']:.4f}",
+                    "Executing UI presentation pipeline... SUCCESS"
+                ])
+            else:
+                input_sigs = get_cnn_input_signatures(user_input)
+                terminal_logs.extend([
+                    "Querying Hybrid architecture... 0 exact matches found.",
+                    "Activating Convolutional feature extraction...",
+                    f"Generated {len(input_sigs)} isolated n-gram signatures (n=3,4,5).",
+                    "Computing Jaccard similarity across 260,751 dimensional space..."
+                ])
+                
+            simulate_terminal(terminal_logs)
+            
+            # --- RENDER DESCRIPTIVE NEOLOGISM UI ---
+            if compound_data["is_compound"]:
+                st.markdown("#### 🧩 Descriptive Neologism Analysis (Compound Word)")
+                st.info("**Linguistic Note:** This word is constructed from multiple smaller Oshiwambo words glued together. This agglutinative technique is used to describe concepts that are not native to Oshiwambo (e.g., artificial or modern constructs).")
+                
+                c_a, c_b, c_c, c_d = st.columns(4)
+                c_a.markdown(f"**Subject Prefix:**<br>`{compound_data['subject_prefix']}`", unsafe_allow_html=True)
+                c_b.markdown(f"**Verb/Core:**<br>`{compound_data['verb_component']}`", unsafe_allow_html=True)
+                c_c.markdown(f"**Connective:**<br>`{compound_data['bridge']}`", unsafe_allow_html=True)
+                c_d.markdown(f"**Noun/Tail:**<br>`{compound_data['noun_component']}`", unsafe_allow_html=True)
+                st.markdown(f"**Structural Format:** `{compound_data['format']}`")
+                st.markdown("---")
+
+            if exact_matches:
+                origin = best_match['root']
                 matching_word_entries =[e for e in model if e['word'] == best_match['word']]
                 dialects_found = list(set([e['dialect'] for e in matching_word_entries]))
                 root_cluster_entries =[e for e in model if e['root'] == origin]
-                
-                # Execute terminal simulation for Exact Match
-                terminal_logs =[
-                    f"> [INIT] Receiving input stream: '{user_input}'",
-                    "> [PREPROCESS] Normalizing and cleaning text...",
-                    "> [STEMMING] Applying morphological rules (Zimmermann, Uushona, Ndume)...",
-                    f"> [STEMMING] Extracted base root: '{identified_morpheme}'",
-                    "> [MODEL] Querying Hybrid CNN-LSTM-SVM architecture...",
-                    f"> [SVM] Exact match located. Scaled weight: {best_match['scaled_weight']:.4f}",
-                    f"> [CLASSIFIER] Classifications triggered: {len(dialects_found)} dialects.",
-                    "> [CLUSTER] Retrieving dialectal variations for root mapping...",
-                    ">[RENDER] Executing UI presentation pipeline... SUCCESS"
-                ]
-                simulate_terminal(terminal_logs)
                 
                 st.markdown("#### 🧬 Agglutinative Language Analysis")
                 st.markdown(f"""<div class="root-box"><div class="root-label">Identified Morphological Root</div><div class="root-text">{identified_morpheme}</div></div>""", unsafe_allow_html=True)
@@ -233,7 +279,6 @@ if page == "Diagnostic Tool":
                             "Scaled SVM Weight": f"{entry['scaled_weight']:.4f}"
                         })
                     else:
-                        # Prioritize exact character match for the table if multiple word variants exist for a dialect
                         if entry['word'].lower() == user_input:
                             for idx, c in enumerate(comparisons):
                                 if c['Dialect Classifier'] == entry['dialect']:
@@ -246,9 +291,7 @@ if page == "Diagnostic Tool":
                                     
                 df_comp = pd.DataFrame(sorted(comparisons, key=lambda x: x['Dialect Classifier']))
                 
-                # --- Exact text character precise matching logic for highlighting ---
                 def highlight_exact_match(row):
-                    # Checks strict text equality between the exact user input and the evaluated row
                     if user_input == str(row['Linguistic Variation']).lower().strip():
                         return['background: linear-gradient(90deg, #2d3748 0%, #4a5568 100%); color: white; font-weight: bold'] * len(row)
                     return [''] * len(row)
@@ -257,7 +300,6 @@ if page == "Diagnostic Tool":
 
             else:
                 # --- PREDICTIVE CLASSIFICATION FOR UNKNOWN WORDS ---
-                input_sigs = get_cnn_input_signatures(user_input)
                 scored_entries =[]
                 for entry in model:
                     entry_sigs = set(entry.get('sig',[]))
@@ -270,29 +312,19 @@ if page == "Diagnostic Tool":
                     best_fuzzy_match = scored_entries[0][1]
                     fuzzy_score = scored_entries[0][0]
                     
-                    if fuzzy_score > 0.15: # Confidence threshold
+                    # Lowered threshold to easily accommodate sub-component matching
+                    if fuzzy_score > 0.045: 
                         predicted_dialect = best_fuzzy_match['dialect']
-                        
-                        # Reconstruction logic
                         user_input_root = extract_oshiwambo_root(user_input)
                         reconstructed_word = reconstruct_morphology(user_input_root, best_fuzzy_match['word'])
                         
-                        # Execute terminal simulation for Predictive Fuzzy Match
-                        terminal_logs =[
-                            f"> [INIT] Receiving input stream: '{user_input}'",
-                            "> [PREPROCESS] Normalizing and cleaning text...",
-                            "> [MODEL] Querying Hybrid architecture... 0 exact matches found.",
-                            ">[CNN] Activating Convolutional feature extraction...",
-                            f"> [CNN] Extracted base root: '{user_input_root}'",
-                            f"> [CNN] Generated {len(input_sigs)} overlapping n-gram signatures (n=3,4,5).",
-                            "> [FUSION] Computing Jaccard similarity across 260,751 dimensional space...",
-                            f"> [LSTM-SVM] Best viable latent match: '{best_fuzzy_match['word']}' (Confidence: {fuzzy_score:.1%})",
-                            "> [MORPHOLOGY] Synthesizing predicted morphological structure (Input Root + Target Affixes)...",
-                            "> [RENDER] Executing predictive UI pipeline... SUCCESS"
+                        terminal_logs_success =[
+                            f"Best viable latent match: '{best_fuzzy_match['word']}' (Confidence: {fuzzy_score:.1%})",
+                            "Synthesizing predicted morphological structure (Input Root + Target Affixes)...",
+                            "Executing predictive UI pipeline... SUCCESS"
                         ]
-                        simulate_terminal(terminal_logs)
+                        simulate_terminal(terminal_logs_success)
                         
-                        st.markdown("---")
                         st.markdown("#### 🤖 Predictive Classification for Unknown Term")
                         st.warning(f"The term **'{user_input}'** was not found. Based on morphological similarity to the known word **'{best_fuzzy_match['word']}'** (Confidence: {fuzzy_score:.1%}), the model predicts the following:")
                         
@@ -311,17 +343,11 @@ if page == "Diagnostic Tool":
                         st.caption("*Disclaimer: This prediction maintains your input root while applying the morphological affix patterns of the closest dialect match.*")
 
                     else:
-                        # Failed match terminal output
-                        terminal_logs = [
-                            f"> [INIT] Receiving input stream: '{user_input}'",
-                            "> [PREPROCESS] Normalizing and cleaning text...",
-                            "> [MODEL] Querying Hybrid architecture... 0 exact matches found.",
-                            "> [CNN] Activating Convolutional feature extraction...",
-                            "> [FUSION] Computing Jaccard similarity...",
-                            f"> [ERROR] Maximum similarity ({fuzzy_score:.1%}) failed to pass confidence threshold (15.0%).",
-                            "> [RENDER] Halting pipeline... FATAL"
+                        terminal_logs_failure =[
+                            f"Maximum similarity ({fuzzy_score:.1%}) failed to pass confidence threshold (4.5%).",
+                            "Halting pipeline... FATAL"
                         ]
-                        simulate_terminal(terminal_logs)
+                        simulate_terminal(terminal_logs_failure)
                         st.error(f"'{user_input}' did not generate any viable morphological patterns. Unable to classify.")
                 else:
                     st.error(f"'{user_input}' could not be processed. Please check for typos or try a different term.")
