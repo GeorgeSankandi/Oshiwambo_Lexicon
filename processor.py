@@ -20,54 +20,56 @@ df.columns = df.columns.str.strip()
 
 target_dialects =['Aa-ndonga', 'Aa-kwambi', 'Aa-mbalanhu', 'Aa-kwaluudhi', 'Aa-kwanyama', 'Aa-ngandjera', 'Aa-mbandja']
 
+# Shared Prefix/Suffix Sets updated with PDF Noun Classes (ii-, omau-, etc.)
+PREFIXES = sorted(['omalu', 'omaku', 'omau', 'otshi', 'otava', 'otaka', 'otashi', 'ohandi', 'okwa', 'omu', 'ova', 'omi', 'oma', 'olu', 'oka', 'oku', 'aba', 'oya', 'ota', 'oo', 'ee', 'ii', 'oi', 'ou', 'uu', 'aa', 'me', 'ko', 'po', 'mu', 'shi', 'sha', 'e', 'o', 'a', 'i'], key=len, reverse=True)
+SUFFIXES = sorted(['ululwa', 'shakati', 'enena', 'inina', 'elela', 'ilila', 'ulula', 'olola', 'onona', 'ununa', 'afana', 'mweno', 'kulu', 'gona', 'thana', 'thani', 'elwa', 'elwi', 'thwa', 'thwi', 'elel', 'ena', 'eni', 'uka', 'oka', 'wa', 'po', 'ko', 'mo', 'nge', 'ith', 'ik', 'ek', 'el', 'il'], key=len, reverse=True)
+
+def analyze_compound_word(word):
+    word = str(word).lower().strip()
+    subject_prefixes = sorted(['shaa', 'sha', 'oshi', 'oka', 'omu', 'otshi', 'aa', 'ee', 'uu', 'ou', 'oma', 'omi'], key=len, reverse=True)
+    bridges = sorted(['kwa', 'ko', 'mo', 'po', 'na', 'ya', 'wa', 'ka', 'lwa'], key=len, reverse=True)
+    
+    for p in subject_prefixes:
+        if word.startswith(p):
+            remainder = word[len(p):]
+            for b in bridges:
+                b_idx = remainder.find(b)
+                if b_idx >= 3 and b_idx <= len(remainder) - len(b) - 3:
+                    verb_part = remainder[:b_idx]
+                    noun_part = remainder[b_idx + len(b):]
+                    return {
+                        "is_compound": True,
+                        "subject_prefix": p,
+                        "verb_component": verb_part,
+                        "bridge": b,
+                        "noun_component": noun_part,
+                        "format": f"{p}-{verb_part}-{b}-{noun_part}"
+                    }
+    return {"is_compound": False}
+
 def extract_oshiwambo_root(word):
-    """
-    Stem Oshiwambo words using morphological rules from multiple linguistic sources,
-    including Uushona (2019) on German loanwords.
-    """
-    # Prefixes sorted by length to prevent partial matching errors
-    prefixes = sorted([
-        'omalu', 'omaku', 'otshi', 'otava', 'otaka', 'otashi', 'ohandi', 'okwa', 'omu', 'ova', 
-        'omi', 'oma', 'olu', 'oka', 'oku', 'aba', 'oya', 'ota', 'oo', 'ee', 'oi', 'ou', 
-        'uu', 'aa', 'me', 'ko', 'po', 'mu', 'shi', 'e', 'o', 'a', 'i'
-    ], key=len, reverse=True)
-    
-    # Suffixes sorted by length
-    suffixes = sorted([
-        'ululwa', 'shakati', 'enena', 'inina', 'elela', 'ilila', 'ulula', 'olola', 'onona', 'ununa', 'afana', # Verbal Extensions
-        'mweno', 'kulu', 'gona', # Kinship/Diminutive Suffixes
-        'thana', 'thani', 'elwa', 'elwi', 'thwa', 'thwi', 'elel',
-        'ena', 'eni', 'uka', 'oka', 'wa', 'po', 'ko', 'mo', 'nge', 'ith', 'ik', 'ek', 'el', 'il' # Suffixes
-    ], key=len, reverse=True)
-    
     stem = str(word).lower().strip()
-    
-    # Infix handling, e.g., omunangeshefa -> omungeshefa
-    if 'nange' in stem:
-        stem = stem.replace('nange', 'nge')
-    
-    # Strip Prefix
-    for pref in prefixes:
+    if 'nange' in stem: stem = stem.replace('nange', 'nge')
+    for pref in PREFIXES:
         if stem.startswith(pref) and len(stem) > len(pref) + 2:
             stem = stem[len(pref):]
             break
-            
-    # Strip Suffix
-    for suff in suffixes:
+    for suff in SUFFIXES:
         if stem.endswith(suff) and len(stem) > len(suff) + 1:
             stem = stem[:-len(suff)]
             break
-            
     return stem
 
 def get_cnn_morphological_fingerprints(word):
-    """
-    Generate sub-word feature extractions representing the CNN Layer's n-gram analysis.
-    """
     sigs = set()
-    root_form = extract_oshiwambo_root(word)
+    compound_data = analyze_compound_word(word)
     
-    for term in [word, root_form]:
+    if compound_data.get("is_compound"):
+        terms_to_n_gram = [compound_data['verb_component'], compound_data['noun_component']]
+    else:
+        terms_to_n_gram =[word, extract_oshiwambo_root(word)]
+        
+    for term in terms_to_n_gram:
         if len(term) <= 5:
             sigs.add(term)
         for n in (3, 4, 5):
@@ -75,7 +77,6 @@ def get_cnn_morphological_fingerprints(word):
                 sigs.add(term[i:i+n])
     return list(sigs)
 
-# 3. Methodological Performance: Frequency Mapping for Min-Max Scaling
 freq_map = {}
 for _, row in df.iterrows():
     for dialect in target_dialects:
@@ -90,7 +91,6 @@ x_max = max(freq_map.values()) if freq_map else 1
 if x_min == x_max:
     x_max = x_min + 1  
 
-# 4. Build the structured feature index
 dataset =[]
 
 for _, row in df.iterrows():
@@ -116,13 +116,7 @@ for _, row in df.iterrows():
                     "sig": get_cnn_morphological_fingerprints(word_clean)
                 })
 
-# 5. Save to JSON
 with open('dialects_model.json', 'w', encoding='utf-8') as f:
     json.dump(dataset, f, ensure_ascii=False)
 
 print(f"🚀 SUCCESS: Empirical Data & NLP Pipeline Complete.")
-print(f"-> Integrated Loanword Phonology (Uushona, 2019) and Proverbial Morphology (Ndume, 2020).")
-print(f"-> Evaluated 5,955 samples across 7 dialects.")
-print(f"-> Dimensionality reduction mapped features to 5,000 dimension limits.")
-print(f"-> Applied CNN Morphological Fingerprints (3, 4, 5 kernels).")
-print(f"-> Normalized Dialectal Distribution via Min-Max Scaling.")

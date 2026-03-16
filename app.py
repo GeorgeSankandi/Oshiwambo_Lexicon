@@ -29,8 +29,8 @@ st.markdown("""
     
     /* WINDOWS POWERSHELL THEME */
     .terminal-container { 
-        background-color: #012456; /* Exact Windows PowerShell Blue */
-        color: #CCCCCC; /* Classic off-white terminal text */
+        background-color: #012456; 
+        color: #CCCCCC; 
         font-family: 'Consolas', 'Courier New', monospace; 
         padding: 15px; 
         border-radius: 2px;
@@ -42,7 +42,7 @@ st.markdown("""
         box-shadow: 3px 3px 10px rgba(0,0,0,0.3);
     }
     .ps-prompt {
-        color: #EEEC7D; /* Classic PowerShell prompt yellow */
+        color: #EEEC7D; 
         font-weight: bold;
     }
     .ps-text {
@@ -95,13 +95,44 @@ def load_full_csv():
     return None
 
 # Centralized morphological lists
-PREFIXES = sorted(['omalu', 'omaku', 'otshi', 'otava', 'otaka', 'otashi', 'ohandi', 'okwa', 'omu', 'ova', 'omi', 'oma', 'olu', 'oka', 'oku', 'aba', 'oya', 'ota', 'oo', 'ee', 'oi', 'ou', 'uu', 'aa', 'me', 'ko', 'po', 'mu', 'shi', 'sha', 'e', 'o', 'a', 'i'], key=len, reverse=True)
+PREFIXES = sorted(['omalu', 'omaku', 'omau', 'otshi', 'otava', 'otaka', 'otashi', 'ohandi', 'okwa', 'omu', 'ova', 'omi', 'oma', 'olu', 'oka', 'oku', 'aba', 'oya', 'ota', 'oo', 'ee', 'ii', 'oi', 'ou', 'uu', 'aa', 'me', 'ko', 'po', 'mu', 'shi', 'sha', 'e', 'o', 'a', 'i'], key=len, reverse=True)
 SUFFIXES = sorted(['ululwa', 'shakati', 'enena', 'inina', 'elela', 'ilila', 'ulula', 'olola', 'onona', 'ununa', 'afana', 'mweno', 'kulu', 'gona', 'thana', 'thani', 'elwa', 'elwi', 'thwa', 'thwi', 'elel', 'ena', 'eni', 'uka', 'oka', 'wa', 'po', 'ko', 'mo', 'nge', 'ith', 'ik', 'ek', 'el', 'il'], key=len, reverse=True)
 
+# --- NEW GRAMMATICAL NUMBER LOGIC (PDF RULES) ---
+def detect_number_and_prefix(word):
+    """Detects if a word is Singular or Plural based on Oshiwambo Noun Classes."""
+    w = word.lower()
+    plurals =['omalu', 'omaku', 'omau', 'oma', 'omi', 'aa', 'ii', 'oo']
+    for p in plurals:
+        if w.startswith(p) and len(w) > len(p):
+            return 'plural', p
+            
+    if w.startswith('uu') and len(w) > 2:
+        return 'ambiguous', 'uu' # 'uu' can be singular (Class 8) or plural (Class 7)
+        
+    singulars =['otshi', 'oshi', 'omu', 'olu', 'oka', 'oku', 'e', 'o']
+    for p in singulars:
+        if w.startswith(p) and len(w) > len(p):
+            return 'singular', p
+            
+    return 'unknown', ''
+
+def get_aligned_prefix(ref_word, target_num):
+    """Converts a prefix to match the target grammatical number (Singular <-> Plural)."""
+    ref_num, ref_pref = detect_number_and_prefix(ref_word)
+    if target_num == 'unknown' or ref_num == 'unknown' or ref_num == target_num:
+        return ref_pref
+        
+    if target_num == 'plural':
+        mapping = {'omu': 'aa', 'e': 'oma', 'oshi': 'ii', 'otshi': 'ii', 'o': 'oo', 'olu': 'omalu', 'oka': 'uu', 'oku': 'omaku', 'uu': 'omau'}
+        return mapping.get(ref_pref, ref_pref)
+    elif target_num == 'singular':
+        mapping = {'aa': 'omu', 'omi': 'omu', 'oma': 'e', 'ii': 'oshi', 'oo': 'o', 'omalu': 'olu', 'uu': 'oka', 'omau': 'uu', 'omaku': 'oku'}
+        return mapping.get(ref_pref, ref_pref)
+        
+    return ref_pref
+
 def analyze_compound_word(word):
-    """
-    Detects Oshiwambo words that consist of multiple smaller words glued together.
-    """
     word = str(word).lower().strip()
     subject_prefixes = sorted(['shaa', 'sha', 'oshi', 'oka', 'omu', 'otshi', 'aa', 'ee', 'uu', 'ou', 'oma', 'omi'], key=len, reverse=True)
     bridges = sorted(['kwa', 'ko', 'mo', 'po', 'na', 'ya', 'wa', 'ka', 'lwa'], key=len, reverse=True)
@@ -136,9 +167,6 @@ def extract_oshiwambo_root(word):
     return stem
 
 def get_cnn_input_signatures(word):
-    """
-    Prioritizes isolated components for Descriptive Neologisms to prevent Jaccard dilution.
-    """
     sigs = set()
     compound_data = analyze_compound_word(word)
     
@@ -154,15 +182,19 @@ def get_cnn_input_signatures(word):
                 sigs.add(term[i:i+n])
     return sigs
 
-def reconstruct_morphology(user_root, reference_match_word):
-    ref_stem = str(reference_match_word).lower().strip()
-    found_prefix = ""
-    for pref in PREFIXES:
-        if ref_stem.startswith(pref) and len(ref_stem) > len(pref) + 2:
-            found_prefix = pref
-            ref_stem = ref_stem[len(pref):] 
-            break
-            
+def reconstruct_morphology(user_input, user_root, reference_match_word):
+    u_num, _ = detect_number_and_prefix(user_input)
+    
+    # Align prefix to the input grammatical number
+    aligned_pref = get_aligned_prefix(reference_match_word, u_num) if u_num in ['singular', 'plural'] else ""
+    
+    if not aligned_pref:
+        ref_stem = str(reference_match_word).lower().strip()
+        for pref in PREFIXES:
+            if ref_stem.startswith(pref) and len(ref_stem) > len(pref) + 2:
+                aligned_pref = pref
+                break
+                
     found_suffix = ""
     ref_stem_full = str(reference_match_word).lower().strip()
     for suff in SUFFIXES:
@@ -170,13 +202,12 @@ def reconstruct_morphology(user_root, reference_match_word):
             found_suffix = suff
             break
             
-    return f"{found_prefix}{user_root}{found_suffix}"
+    return f"{aligned_pref}{user_root}{found_suffix}"
 
 def simulate_terminal(logs):
     terminal_placeholder = st.empty()
     current_text = ""
     for log in logs:
-        # Authentic Windows PowerShell formatting
         current_text += f"<span class='ps-prompt'>PS C:\\Oshiwambo_NLP&gt;</span> <span class='ps-text'>{log}</span><br>"
         terminal_placeholder.markdown(f'<div class="terminal-container">{current_text}</div>', unsafe_allow_html=True)
         time.sleep(0.35) 
@@ -194,16 +225,22 @@ if page == "Diagnostic Tool":
     model = load_model()
     if model:
         user_input = st.text_input("Enter a dialect token, phrase, or base root (Fuzzy Matching & Grammar Stemming Active):", 
-                                  placeholder="e.g. 'shaningwakomuntu', 'okutondoka', 'oshikumbafa'...").strip().lower()
+                                  placeholder="e.g. 'shaningwakomuntu', 'okutondoka', 'oshikumbafa', 'iikombo'...").strip().lower()
 
         if user_input:
             compound_data = analyze_compound_word(user_input)
+            u_num, u_pref = detect_number_and_prefix(user_input)
+            
+            # Exact match extraction
             exact_matches =[entry for entry in model if entry['word'] == user_input or entry['root'].lower() == user_input]
             
             terminal_logs =[
                 f"Initializing stream for input: '{user_input}'",
                 "Normalizing and cleaning text..."
             ]
+            
+            if u_num in ['singular', 'plural']:
+                terminal_logs.append(f"Grammatical Noun Class constraint applied: Evaluated as '{u_num.upper()}'.")
             
             if compound_data["is_compound"]:
                 terminal_logs.extend([
@@ -272,9 +309,18 @@ if page == "Diagnostic Tool":
                     dialects_logged = [c['Dialect Classifier'] for c in comparisons]
                     
                     if entry['dialect'] not in dialects_logged:
+                        # --- GRAMMATICAL NUMBER AGREEMENT (SINGULAR / PLURAL FORCING) ---
+                        display_word = entry['word']
+                        if u_num in ['singular', 'plural']:
+                            r_num, r_pref = detect_number_and_prefix(entry['word'])
+                            if r_num != 'unknown' and r_num != u_num:
+                                aligned_pref = get_aligned_prefix(entry['word'], u_num)
+                                stem = entry['word'][len(r_pref):]
+                                display_word = aligned_pref + stem
+                                
                         comparisons.append({
                             "Dialect Classifier": entry['dialect'], 
-                            "Linguistic Variation": entry['word'].title(), 
+                            "Linguistic Variation": display_word.title(), 
                             "Morphological Root": entry.get('extracted_root', '').title(), 
                             "Scaled SVM Weight": f"{entry['scaled_weight']:.4f}"
                         })
@@ -299,7 +345,6 @@ if page == "Diagnostic Tool":
                 st.table(df_comp.style.apply(highlight_exact_match, axis=1))
 
             else:
-                # --- PREDICTIVE CLASSIFICATION FOR UNKNOWN WORDS ---
                 scored_entries =[]
                 for entry in model:
                     entry_sigs = set(entry.get('sig',[]))
@@ -312,11 +357,10 @@ if page == "Diagnostic Tool":
                     best_fuzzy_match = scored_entries[0][1]
                     fuzzy_score = scored_entries[0][0]
                     
-                    # Lowered threshold to easily accommodate sub-component matching
                     if fuzzy_score > 0.045: 
                         predicted_dialect = best_fuzzy_match['dialect']
                         user_input_root = extract_oshiwambo_root(user_input)
-                        reconstructed_word = reconstruct_morphology(user_input_root, best_fuzzy_match['word'])
+                        reconstructed_word = reconstruct_morphology(user_input, user_input_root, best_fuzzy_match['word'])
                         
                         terminal_logs_success =[
                             f"Best viable latent match: '{best_fuzzy_match['word']}' (Confidence: {fuzzy_score:.1%})",
