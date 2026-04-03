@@ -4,6 +4,13 @@ import glob
 import os
 import re
 
+# =====================================================================
+# HYBRID FEATURE PIPELINE & MORPHOLOGICAL STEMMING SCRIPT
+# Aligns with Sections 6.4, 6.5, and 6.7
+# Prepares the data, establishes empirical frequencies to handle data sparsity, 
+# and builds structural feature mappings.
+# =====================================================================
+
 # 1. Clean up old files to ensure a fresh build
 if os.path.exists('dialects_model.json'):
     os.remove('dialects_model.json')
@@ -22,8 +29,12 @@ target_dialects = ['Aa-ndonga', 'Aa-kwambi', 'Aa-mbalanhu', 'Aa-kwaluudhi', 'Aa-
 
 def extract_oshiwambo_root(word):
     """
+    Objective 1: Morphological Dissection (Section 6.7.1)
     Stem Oshiwambo words using morphological rules from multiple linguistic sources,
     including Uushona (2019) on German loanwords.
+    
+    Utilizes a high-fidelity 'Peeling' mechanism by establishing a 
+    descending-order list to prevent partial matching errors.
     """
     # Prefixes sorted by length to prevent partial matching errors
     prefixes = sorted([
@@ -62,7 +73,9 @@ def extract_oshiwambo_root(word):
 
 def get_cnn_morphological_fingerprints(word):
     """
+    Objective 2: Spatial Pattern Recognition (CNN) (Section 6.7.2)
     Generate sub-word feature extractions representing the CNN Layer's n-gram analysis.
+    Applies sliding windows (kernels N=3,4,5) to encode dialect-specific syntactic rules.
     """
     sigs = set()
     root_form = extract_oshiwambo_root(word)
@@ -76,6 +89,8 @@ def get_cnn_morphological_fingerprints(word):
     return list(sigs)
 
 # 3. Methodological Performance: Frequency Mapping for Min-Max Scaling
+# Section 6.4: Addresses Dialectal Dominance to ensure high-frequency dialects 
+# do not overwhelm the machine learning process of marginalized ones.
 freq_map = {}
 for _, row in df.iterrows():
     for dialect in target_dialects:

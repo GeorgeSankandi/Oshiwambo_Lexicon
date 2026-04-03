@@ -7,9 +7,14 @@ import numpy as np
 import time
 import random
 
-# ======================================================
-# CONFIGURATION (Strictly from Methodology Text)
-# ======================================================
+# =====================================================================
+# DEEP LEARNING ARCHITECTURE & SEQUENCE CONTEXT MAPPING
+# Aligns with Section 6.2 & 6.7.2
+# Represents the temporal memory / sequence flow methodology utilized to
+# combat the massive out-of-vocabulary or unknown terms problem by
+# modeling character-level grammatical dependencies (Bantu verb conjugations).
+# =====================================================================
+
 VOCAB_SIZE = 800        # "Vocabulary size: 800 subword units"
 SEQ_LENGTH = 32         # "Maximum sequence length: 32 tokens"
 D_MODEL = 256           # "Model dimension: 256"
@@ -73,6 +78,7 @@ def train_transformer_system():
         f.write('\n'.join(all_sentences))
 
     # 2. TRAIN TOKENIZER
+    # Aligns with Section 6.5 (Tokenization)
     print(f"Training SentencePiece (Unigram, Vocab={VOCAB_SIZE}, Byte Fallback=True)...")
     
     user_defined = ",".join(CUSTOM_TOKENS + DIALECT_TAGS)
