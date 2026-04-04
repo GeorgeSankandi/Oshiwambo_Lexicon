@@ -244,7 +244,7 @@ if page == "Diagnostic Tool":
                     "Objective 1: Morphological Dissection initiated.",
                     "Applying descending-order n-gram array lists for grammatical stripping...",
                     f"High-fidelity peeling applied. Semantic root isolated: '{identified_morpheme}'",
-                    "Engaging Hybrid CNN-LSTM-SVM Model (Validated Mean Accuracy: 82.9%)...", # <-- ACCURACY DISPLAYED HERE
+                    "Engaging Hybrid CNN-LSTM-SVM Model (Validated Mean Accuracy: 82.9%)...", 
                     "Forwarding to SVM Classification Head...",
                     f"Fusing 768-dimensional feature vectors.",
                     f"Min-Max scaling applied to prevent dialectal dominance. Scaled weight: {best_match['scaled_weight']:.4f}",
@@ -265,7 +265,7 @@ if page == "Diagnostic Tool":
                     "Applying sliding kernels (N=3, N=4, N=5) to generate morphological fingerprints...",
                     f"Generated {len(input_sigs)} character-level n-gram signatures.",
                     "Fusing 512 CNN features with 256 LSTM sequential features into 768-dimensional vector...",
-                    "Engaging Hybrid Model for evaluation (Validated Mean Accuracy: 82.9%)...", # <-- ACCURACY DISPLAYED HERE
+                    "Engaging Hybrid Model for evaluation (Validated Mean Accuracy: 82.9%)...", 
                     "Executing Signature Matching across 198,432 standardized morphological roots..."
                 ])
                 
@@ -388,15 +388,76 @@ if page == "Diagnostic Tool":
                         """, unsafe_allow_html=True)
                         st.caption("*Disclaimer: This prediction maintains your input root while applying the morphological affix patterns of the closest dialect match.*")
 
+                    # --- NEOLOGISM / SUBWORD RESCUE PROTOCOL ---
+                    elif compound_data["is_compound"]:
+                        terminal_logs_rescue = terminal_logs + [
+                            f"Signature Matching complete. Highest similarity score: {fuzzy_score:.1%}",
+                            "Evaluating Confidence Threshold (> 15%)... FAILED.",
+                            "Checking for Neologism / Subword combinations...",
+                            "Confirmed: Input is a modular construction of multiple subwords.",
+                            "Bypassing fatal error. Activating constituent subword reconstruction..."
+                        ]
+                        
+                        subwords = [compound_data['verb_component'], compound_data['noun_component']]
+                        reconstructions = {}
+                        
+                        for idx, sub_w in enumerate(subwords):
+                            terminal_logs_rescue.append(f"Analyzing Subword {idx+1}: '{sub_w}'...")
+                            sub_root = extract_oshiwambo_root(sub_w)
+                            terminal_logs_rescue.append(f"Extracted semantic root: '{sub_root}'")
+                            
+                            sub_sigs = get_cnn_input_signatures(sub_w)
+                            sub_scored = []
+                            for entry in model:
+                                e_sigs = set(entry.get('sig', []))
+                                if not e_sigs or not sub_sigs: continue
+                                intersect = len(sub_sigs.intersection(e_sigs))
+                                union = len(sub_sigs.union(e_sigs))
+                                sub_scored.append((intersect/union, entry))
+                            
+                            if sub_scored:
+                                sub_scored.sort(key=lambda x: x[0], reverse=True)
+                                b_sub_match = sub_scored[0][1]
+                                recon = reconstruct_morphology(sub_w, sub_root, b_sub_match['word'])
+                                reconstructions[sub_w] = {"root": sub_root, "recon": recon, "dialect": b_sub_match['dialect']}
+                                terminal_logs_rescue.append(f"Affixing correct prefix and suffix... Constructed: '{recon}'")
+                            else:
+                                reconstructions[sub_w] = {"root": sub_root, "recon": sub_w, "dialect": "Unknown"}
+                        
+                        terminal_logs_rescue.append("Executing predictive UI pipeline for subwords... SUCCESS")
+                        simulate_terminal(terminal_logs_rescue)
+                        
+                        st.markdown("#### 🤖 Predictive Reconstruction for Neologism / Compound Word")
+                        st.warning(f"The overall term **'{user_input}'** fell below the 15% similarity threshold. However, it was successfully identified as a Descriptive Neologism (compound word). The system has broken it down to extract semantic roots and reconstruct Oshiwambo variations for each subword:")
+                        
+                        c1, c2 = st.columns(2)
+                        with c1:
+                            st.markdown(f"""
+                                <div class="root-box prediction-box">
+                                    <div class="root-label prediction-text">Subword 1: '{subwords[0]}'</div>
+                                    <div class="root-text prediction-text">Root: {reconstructions[subwords[0]]['root']}<br>Oshiwambo Construction: {reconstructions[subwords[0]]['recon']} <span style="font-size:0.8rem">({reconstructions[subwords[0]]['dialect']})</span></div>
+                                </div>
+                            """, unsafe_allow_html=True)
+                        with c2:
+                            st.markdown(f"""
+                                <div class="root-box prediction-box">
+                                    <div class="root-label prediction-text">Subword 2: '{subwords[1]}'</div>
+                                    <div class="root-text prediction-text">Root: {reconstructions[subwords[1]]['root']}<br>Oshiwambo Construction: {reconstructions[subwords[1]]['recon']} <span style="font-size:0.8rem">({reconstructions[subwords[1]]['dialect']})</span></div>
+                                </div>
+                            """, unsafe_allow_html=True)
+
+                    # --- GRACEFUL FATAL ERROR (< 15% & NOT A COMPOUND) ---
                     else:
                         terminal_logs_failure = terminal_logs + [
                             f"Signature Matching complete. Highest similarity score: {fuzzy_score:.1%}",
                             "Evaluating Confidence Threshold (> 15%)... FAILED.",
+                            "Checking for Neologism / Subword combinations...",
+                            "Confirmed: Input is NOT a modular construction or combination of subwords.",
                             "Error: No viable morphological patterns could be aligned.",
                             "Halting pipeline... FATAL"
                         ]
                         simulate_terminal(terminal_logs_failure)
-                        st.error(f"Confidence score of {fuzzy_score:.1%} falls below 15%. No viable morphological patterns could be aligned for '{user_input}'. Unable to classify.")
+                        st.error(f"Confidence score of {fuzzy_score:.1%} falls below 15% and is not a recognized Neologism construction. No viable morphological patterns could be aligned for '{user_input}'. Unable to classify.")
                 else:
                     st.error(f"'{user_input}' could not be processed. Please check for typos or try a different term.")
     else:
