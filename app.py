@@ -7,7 +7,6 @@ import time
 
 # =====================================================================
 # 1. PAGE CONFIGURATION & CORPORATE STYLING
-# Aligns with Section 6.2: NLP Framework Ecosystem
 # =====================================================================
 st.set_page_config(page_title="Oshiwambo NLP Preservation", page_icon="🇳🇦", layout="wide")
 
@@ -29,6 +28,8 @@ st.markdown("""
     .metric-box { background-color: #e2e8f0; padding: 10px; border-radius: 5px; font-family: monospace; font-size:0.85rem;}
     .prediction-box { background-color: #FFF5F5; border-left-color: #C53030; }
     .prediction-text { color: #9B2C2C !important; }
+    .rescue-box { background-color: #EBF8FF; border-left-color: #2B6CB0; }
+    .rescue-text { color: #2C5282 !important; }
     
     /* WINDOWS POWERSHELL THEME */
     .terminal-container { 
@@ -56,7 +57,6 @@ st.markdown("""
 
 # =====================================================================
 # 2. NAVIGATION SIDEBAR
-# Aligns with Section 6.4 (Experimental Setup and Dataset Characteristics)
 # =====================================================================
 st.sidebar.title("🗂️ System Navigation")
 page = st.sidebar.radio("Select View:", ["Diagnostic Tool", "Full Dataset Viewer"])
@@ -73,7 +73,7 @@ st.sidebar.markdown("""
 """)
 
 with st.sidebar.expander("Linguistic Morphology Rules"):
-    st.caption("Affixes")
+    st.caption("Based on Zimmermann (1998), Uushona (2019), and Ndume (2020)")
     st.write("**Prefixes:** omu-, ova-, oshi-, oka-, otshi-, aa-, pu-, ku-, mu-, sha- etc.")
     st.write("**Verbal Extensions (Suffixes):**")
     st.write("- **Passive:** -wa | **Applied:** -ela/-ila")
@@ -87,7 +87,6 @@ with st.sidebar.expander("Individual Architecture Baselines"):
 
 # =====================================================================
 # 3. DATA LOADING HELPERS & STEMMING LOGIC
-# Aligns with Section 6.5 (Data Preprocessing)
 # =====================================================================
 def load_model():
     if os.path.exists('dialects_model.json'):
@@ -103,12 +102,11 @@ def load_full_csv():
         return df
     return None
 
-# Centralized morphological lists (Section 6.7.1)
+# Centralized morphological lists
 PREFIXES = sorted(['omalu', 'omaku', 'omau', 'otshi', 'otava', 'otaka', 'otashi', 'ohandi', 'okwa', 'omu', 'ova', 'omi', 'oma', 'olu', 'oka', 'oku', 'aba', 'oya', 'ota', 'oo', 'ee', 'ii', 'oi', 'ou', 'uu', 'aa', 'me', 'ko', 'po', 'mu', 'shi', 'sha', 'e', 'o', 'a', 'i'], key=len, reverse=True)
 SUFFIXES = sorted(['ululwa', 'shakati', 'enena', 'inina', 'elela', 'ilila', 'ulula', 'olola', 'onona', 'ununa', 'afana', 'mweno', 'kulu', 'gona', 'thana', 'thani', 'elwa', 'elwi', 'thwa', 'thwi', 'elel', 'ena', 'eni', 'uka', 'oka', 'wa', 'po', 'ko', 'mo', 'nge', 'ith', 'ik', 'ek', 'el', 'il'], key=len, reverse=True)
 
 def detect_number_and_prefix(word):
-    """Detects Noun Classes (Singular/Plural) for LSTM sequential context."""
     w = word.lower()
     plurals =['omalu', 'omaku', 'omau', 'oma', 'omi', 'aa', 'ii', 'oo']
     for p in plurals:
@@ -131,7 +129,6 @@ def get_aligned_prefix(ref_word, target_num):
     return ref_pref
 
 def analyze_compound_word(word):
-    """Section 6.6: Descriptive Neologism Analysis"""
     word = str(word).lower().strip()
     subject_prefixes = sorted(['shaa', 'sha', 'oshi', 'oka', 'omu', 'otshi', 'aa', 'ee', 'uu', 'ou', 'oma', 'omi'], key=len, reverse=True)
     bridges = sorted(['kwa', 'ko', 'mo', 'po', 'na', 'ya', 'wa', 'ka', 'lwa'], key=len, reverse=True)
@@ -152,7 +149,6 @@ def analyze_compound_word(word):
     return {"is_compound": False}
 
 def extract_oshiwambo_root(word):
-    """Section 6.7.1: Morphological Dissection"""
     stem = str(word).lower().strip()
     if 'nange' in stem: stem = stem.replace('nange', 'nge')
     for pref in PREFIXES:
@@ -162,7 +158,6 @@ def extract_oshiwambo_root(word):
     return stem
 
 def get_cnn_input_signatures(word):
-    """Section 6.7.2: CNN Spatial Pattern Recognition"""
     sigs = set()
     compound_data = analyze_compound_word(word)
     if compound_data.get("is_compound"): terms = [compound_data["verb_component"], compound_data["noun_component"]]
@@ -174,7 +169,6 @@ def get_cnn_input_signatures(word):
     return set(sigs)
 
 def reconstruct_morphology(user_input, user_root, reference_match_word):
-    """Section 6.7.3: Predictive Reconstruction (Agglutinative Synthesis)"""
     u_num, _ = detect_number_and_prefix(user_input)
     aligned_pref = get_aligned_prefix(reference_match_word, u_num) if u_num in ['singular', 'plural'] else ""
     if not aligned_pref:
@@ -187,8 +181,21 @@ def reconstruct_morphology(user_input, user_root, reference_match_word):
         if ref_stem_full.endswith(suff) and len(ref_stem_full) > len(suff) + 1: found_suffix = suff; break
     return f"{aligned_pref}{user_root}{found_suffix}"
 
+def get_best_subword_match(subword, model):
+    """Helper to find the best match for a deconstructed subword."""
+    sigs = get_cnn_input_signatures(subword)
+    scored = []
+    for entry in model:
+        entry_sigs = set(entry.get('sig', []))
+        if not entry_sigs or not sigs: continue
+        intersection = len(sigs.intersection(entry_sigs)); union = len(sigs.union(entry_sigs))
+        scored.append((intersection / union, entry))
+    if scored:
+        scored.sort(key=lambda x: x[0], reverse=True)
+        return scored[0][1]
+    return None
+
 def simulate_terminal(logs):
-    """Simulates the backend processing logs for the UI."""
     terminal_placeholder = st.empty()
     current_text = ""
     for log in logs:
@@ -217,10 +224,9 @@ if page == "Diagnostic Tool":
             
             exact_matches =[entry for entry in model if entry['word'] == user_input or entry['root'].lower() == user_input]
             
-            # --- BASE TERMINAL LOGS ---
             terminal_logs =[
                 f"Input received: '{user_input}'",
-                "Initiating Tokenization and Quality Check...",
+                "Initiating Tokenization and Quality Check (Section 6.5)...",
                 "Executing Prefix-Root-Postfix-Encoding (PRPE) approach..."
             ]
             
@@ -229,18 +235,17 @@ if page == "Diagnostic Tool":
             
             if compound_data["is_compound"]:
                 terminal_logs.extend([
-                    "Descriptive Neologism Analysis initiated...",
+                    "Descriptive Neologism Analysis initiated (Section 6.6)...",
                     "Agglutinative pattern detected: intense contact borrowing/compound.",
                     f"Deconstructing modular structure: {compound_data['format']}"
                 ])
                 
-            # --- DETERMINISTIC PATH LOGS ---
             if exact_matches:
                 best_match = exact_matches[0]
                 identified_morpheme = best_match.get('extracted_root')
                 terminal_logs.extend([
                     "Querying dataset... Exact match located.",
-                    "Activating Deterministic Path...",
+                    "Activating Deterministic Path (Section 6.2)...",
                     "Objective 1: Morphological Dissection initiated.",
                     "Applying descending-order n-gram array lists for grammatical stripping...",
                     f"High-fidelity peeling applied. Semantic root isolated: '{identified_morpheme}'",
@@ -251,14 +256,12 @@ if page == "Diagnostic Tool":
                     "Executing UI presentation pipeline... SUCCESS"
                 ])
                 simulate_terminal(terminal_logs)
-            
-            # --- DUAL HYBRID PREDICTIVE PATH LOGS ---
             else:
                 input_sigs = get_cnn_input_signatures(user_input)
                 user_input_root = extract_oshiwambo_root(user_input)
                 terminal_logs.extend([
                     "Querying dataset... 0 exact matches found.",
-                    "Activating The Dual Hybrid Architectural Logic Predictive Path...",
+                    "Activating The Dual Hybrid Architectural Logic Predictive Path (Section 6.3)...",
                     "Objective 1: Root Preservation. Extracting user input root...",
                     f"Isolated semantic root: '{user_input_root}'",
                     "Objective 2: Activating CNN Spatial Pattern Recognition...",
@@ -270,7 +273,6 @@ if page == "Diagnostic Tool":
                 ])
                 
             if exact_matches:
-                # --- RENDER DESCRIPTIVE NEOLOGISM UI ---
                 if compound_data["is_compound"]:
                     st.markdown("#### 🧩 Descriptive Neologism Analysis (Compound Word)")
                     st.info("**Linguistic Note:** This word is constructed from multiple smaller Oshiwambo words glued together. This agglutinative technique is used to describe concepts that are not native to Oshiwambo (e.g., artificial or modern constructs).")
@@ -283,7 +285,6 @@ if page == "Diagnostic Tool":
                     st.markdown(f"**Structural Format:** `{compound_data['format']}`")
                     st.markdown("---")
 
-                # --- DETERMINISTIC PATH RESULTS ---
                 origin = best_match['root']
                 matching_word_entries =[e for e in model if e['word'] == best_match['word']]
                 dialects_found = list(set([e['dialect'] for e in matching_word_entries]))
@@ -342,7 +343,6 @@ if page == "Diagnostic Tool":
                 st.table(df_comp.style.apply(highlight_exact_match, axis=1))
 
             else:
-                # --- OUT-OF-VOCABULARY LOGIC ---
                 scored_entries =[]
                 for entry in model:
                     entry_sigs = set(entry.get('sig',[]))
@@ -355,13 +355,14 @@ if page == "Diagnostic Tool":
                     best_fuzzy_match = scored_entries[0][1]
                     fuzzy_score = scored_entries[0][0]
                     
-                    if fuzzy_score > 0.15: 
+                    # NOTE: 5% Strict Confidence Threshold (0.05)
+                    if fuzzy_score > 0.05: 
                         predicted_dialect = best_fuzzy_match['dialect']
                         reconstructed_word = reconstruct_morphology(user_input, user_input_root, best_fuzzy_match['word'])
                         
                         terminal_logs_success = terminal_logs + [
                             f"Signature Matching complete. Highest similarity score: {fuzzy_score:.1%} for reference word '{best_fuzzy_match['word']}'",
-                            "Evaluating Confidence Threshold (> 15%)... PASSED.",
+                            "Evaluating Confidence Threshold (> 5%)... PASSED.",
                             f"Inferred grammatical rules: {predicted_dialect}.",
                             "Objective 3: Initiating Predictive Reconstruction...",
                             f"Analyzing reference word '{best_fuzzy_match['word']}' for Affix Extraction...",
@@ -389,97 +390,81 @@ if page == "Diagnostic Tool":
                         st.caption("*Disclaimer: This prediction maintains your input root while applying the morphological affix patterns of the closest dialect match.*")
 
                     else:
-                        # --- FALLBACK LOGIC FOR LOW-CONFIDENCE OOV: NEOLOGISM DECONSTRUCTION ---
-                        neologism_data = analyze_compound_word(user_input)
-                        if neologism_data["is_compound"]:
-                            subj_prefix = neologism_data["subject_prefix"]
-                            verb_part = neologism_data["verb_component"]
-                            bridge = neologism_data["bridge"]
-                            noun_part = neologism_data["noun_component"]
-                            
-                            verb_root = extract_oshiwambo_root(verb_part)
-                            noun_root = extract_oshiwambo_root(noun_part)
-                            
-                            # Detect dialects for subwords dynamically
-                            def find_best_submatch(sub_word):
-                                s_sigs = get_cnn_input_signatures(sub_word)
-                                best_m, best_s = best_fuzzy_match, 0 # Fallback to global best fuzzy match
-                                for entry in model:
-                                    e_sigs = set(entry.get('sig',[]))
-                                    if not e_sigs or not s_sigs: continue
-                                    score = len(s_sigs.intersection(e_sigs)) / len(s_sigs.union(e_sigs))
-                                    if score > best_s:
-                                        best_s = score
-                                        best_m = entry
-                                return best_m
-                                
-                            verb_match = find_best_submatch(verb_part)
-                            noun_match = find_best_submatch(noun_part)
-                            
-                            verb_dialect = verb_match['dialect']
-                            noun_dialect = noun_match['dialect']
-
-                            reconstructed_verb = reconstruct_morphology(verb_part, verb_root, verb_match['word'])
-                            reconstructed_noun = reconstruct_morphology(noun_part, noun_root, noun_match['word'])
-                            
-                            # Construct the original overall Oshiwambo construction
-                            full_reconstruction = f"{subj_prefix}-{reconstructed_verb}-{bridge}-{reconstructed_noun}"
-
-                            terminal_logs_neologism = terminal_logs + [
-                                f"Signature Matching complete. Highest overall similarity score: {fuzzy_score:.1%}",
-                                "Evaluating Confidence Threshold (> 15%)... FAILED.",
-                                "Activating fallback: Confirming Neologism Construction...",
-                                "Result: Compound sub-word structure confirmed. Preventing fatal error.",
-                                "Deconstructing sub-words and initiating individual dialect detection...",
-                                f"Verb subword dialect detected: {verb_dialect}",
-                                f"Noun subword dialect detected: {noun_dialect}",
-                                "Extracting semantic roots and affixing prefixes/suffixes for each component...",
-                                "Reconstructing full neologism format...",
-                                "Executing neologism breakdown UI pipeline... SUCCESS"
+                        # ============================================================
+                        # NEOLOGISM / SUBWORD RESCUE PROTOCOL
+                        # Activated only when falling below the 5% threshold
+                        # ============================================================
+                        if compound_data["is_compound"]:
+                            terminal_logs_rescue = terminal_logs + [
+                                f"Signature Matching complete. Score ({fuzzy_score:.1%}) falls below the strict Confidence Threshold (5%).",
+                                "Evaluating for Neologism / Subword composition...",
+                                "Input confirmed as a compound/neologism construction.",
+                                "Activating Neologism Subword Rescue Protocol...",
+                                "Deconstructing into constituent subwords...",
+                                "Extracting semantic roots and detecting dialects for each subword...",
+                                "Applying Agglutinative Synthesis to reconstruct original structures...",
+                                "Executing Rescue UI pipeline... SUCCESS"
                             ]
-                            simulate_terminal(terminal_logs_neologism)
-
-                            st.markdown("#### 🧩 Low-Confidence Neologism Deconstruction & Synthesis")
-                            st.info(f"The input word **'{user_input}'** failed the 15% confidence threshold. However, the system successfully identified it as a compound neologism. Instead of erroring out, the model deconstructed the word, analyzed the dialects of its sub-components, and reconstructed the full agglutinative structure.")
+                            simulate_terminal(terminal_logs_rescue)
                             
-                            c1, c2, c3, c4 = st.columns(4)
-                            with c1:
-                                st.markdown("**Original Sub-Word**")
-                                st.markdown(f"Verb: `{verb_part}`")
-                                st.markdown(f"Noun: `{noun_part}`")
-                            with c2:
-                                st.markdown("**Detected Dialect**")
-                                st.markdown(f"`{verb_dialect}`")
-                                st.markdown(f"`{noun_dialect}`")
-                            with c3:
-                                st.markdown("**Extracted Semantic Root**")
-                                st.markdown(f"`{verb_root}`")
-                                st.markdown(f"`{noun_root}`")
-                            with c4:
-                                st.markdown("**Reconstructed Subword**")
-                                st.markdown(f"`{reconstructed_verb}`")
-                                st.markdown(f"`{reconstructed_noun}`")
+                            st.markdown("#### 🛠️ Neologism Subword Rescue Protocol")
+                            st.warning(f"The overall confidence score ({fuzzy_score:.1%}) fell below the 5% threshold. However, the system confirmed **'{user_input}'** is a Neologism constructed from multiple modern/shorter subwords. The word has been successfully broken down below:")
+                            
+                            # Process Verb Component
+                            v_comp = compound_data['verb_component']
+                            v_root = extract_oshiwambo_root(v_comp)
+                            v_match = get_best_subword_match(v_comp, model)
+                            v_dialect = v_match['dialect'] if v_match else "Unknown"
+                            v_recon = reconstruct_morphology(v_comp, v_root, v_match['word']) if v_match else v_comp
+                            v_origin = v_match['root'] if v_match else "Unknown"
+                            
+                            # Process Noun Component
+                            n_comp = compound_data['noun_component']
+                            n_root = extract_oshiwambo_root(n_comp)
+                            n_match = get_best_subword_match(n_comp, model)
+                            n_dialect = n_match['dialect'] if n_match else "Unknown"
+                            n_recon = reconstruct_morphology(n_comp, n_root, n_match['word']) if n_match else n_comp
+                            n_origin = n_match['root'] if n_match else "Unknown"
+                            
+                            col1, col2 = st.columns(2)
+                            
+                            with col1:
+                                st.markdown(f"""
+                                    <div class="root-box rescue-box">
+                                        <div class="root-label rescue-text">Subword 1 (Verb Component)</div>
+                                        <div class="root-text rescue-text">{v_comp}</div>
+                                        <hr style="border-color: #bee3f8; margin: 10px 0;">
+                                        <small style="color: #2b6cb0;"><b>Semantic Root:</b> {v_root}<br>
+                                        <b>Detected Dialect:</b> {v_dialect}<br>
+                                        <b>Reconstructed Dialect Form:</b> {v_recon}<br>
+                                        <b>Standard Oshiwambo Origin:</b> {v_origin}</small>
+                                    </div>
+                                """, unsafe_allow_html=True)
                                 
-                            st.markdown("---")
-                            st.markdown(f"""
-                                <div class="root-box prediction-box">
-                                    <div class="root-label prediction-text">Full Reconstructed Oshiwambo Construction</div>
-                                    <div class="root-text prediction-text" style="color: #2b6cb0 !important;">{full_reconstruction}</div>
-                                </div>
-                            """, unsafe_allow_html=True)
-
+                            with col2:
+                                st.markdown(f"""
+                                    <div class="root-box rescue-box">
+                                        <div class="root-label rescue-text">Subword 2 (Noun Component)</div>
+                                        <div class="root-text rescue-text">{n_comp}</div>
+                                        <hr style="border-color: #bee3f8; margin: 10px 0;">
+                                        <small style="color: #2b6cb0;"><b>Semantic Root:</b> {n_root}<br>
+                                        <b>Detected Dialect:</b> {n_dialect}<br>
+                                        <b>Reconstructed Dialect Form:</b> {n_recon}<br>
+                                        <b>Standard Oshiwambo Origin:</b> {n_origin}</small>
+                                    </div>
+                                """, unsafe_allow_html=True)
+                                
                         else:
-                            # --- GRACEFUL ERROR FOR NON-NEOLOGISMS ---
+                            # Graceful error out when < 5% AND NOT a compound/neologism
                             terminal_logs_failure = terminal_logs + [
-                                f"Signature Matching complete. Highest similarity score: {fuzzy_score:.1%}",
-                                "Evaluating Confidence Threshold (> 15%)... FAILED.",
-                                "Activating fallback: Confirming Neologism Construction...",
-                                "Result: No compound sub-word structure found. Not a Neologism.",
+                                f"Signature Matching complete. Score ({fuzzy_score:.1%}) falls below the strict Confidence Threshold (5%).",
+                                "Evaluating for Neologism / Subword composition...",
+                                "Input is NOT a recognized compound or neologism.",
                                 "Error: No viable morphological patterns could be aligned.",
                                 "Halting pipeline... FATAL"
                             ]
                             simulate_terminal(terminal_logs_failure)
-                            st.error(f"Confidence score of {fuzzy_score:.1%} falls below 15%. The input word '{user_input}' is neither recognized in the dataset nor constructed of known sub-words/neologisms. The system must gracefully error out. Unable to classify.")
+                            st.error(f"Confidence score of {fuzzy_score:.1%} falls below the 5% threshold. The system confirmed the word is NOT a combination of subwords or a neologism construction. No viable morphological patterns could be aligned for '{user_input}'. Unable to classify.")
                 else:
                     st.error(f"'{user_input}' could not be processed. Please check for typos or try a different term.")
     else:
