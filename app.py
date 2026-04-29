@@ -27,7 +27,7 @@ db = init_mongo_connection()
 
 # --- Initialize Session States (Pulled from MongoDB if available) ---
 if 'projects' not in st.session_state:
-    st.session_state.projects = []
+    st.session_state.projects =[]
     if db is not None:
         # Load from MongoDB
         for doc in db.projects.find():
@@ -36,12 +36,12 @@ if 'projects' not in st.session_state:
     
     # Set default if empty
     if not st.session_state.projects:
-        st.session_state.projects = ["Initial Diagnostic Project"]
+        st.session_state.projects =["Initial Diagnostic Project"]
         if db is not None:
             db.projects.insert_one({"name": "Initial Diagnostic Project"})
 
 if 'recent_searches' not in st.session_state:
-    st.session_state.recent_searches = []
+    st.session_state.recent_searches =[]
     if db is not None:
         # Load from MongoDB
         for doc in db.searches.find():
@@ -50,16 +50,11 @@ if 'recent_searches' not in st.session_state:
 
 if 'page' not in st.session_state:
     st.session_state.page = "Diagnostic Tool"
-if 'show_right_panel' not in st.session_state:
-    st.session_state.show_right_panel = True
 if 'show_terminal' not in st.session_state:
     st.session_state.show_terminal = False  # Terminal hidden by default
 
 def set_page(new_page):
     st.session_state.page = new_page
-
-def toggle_right_panel():
-    st.session_state.show_right_panel = not st.session_state.show_right_panel
 
 def toggle_terminal():
     st.session_state.show_terminal = not st.session_state.show_terminal
@@ -74,15 +69,30 @@ def get_base64_img(img_path):
         return ""
 
 bg_b64 = get_base64_img("AI5.jpg")
-bg_url = f"data:image/jpeg;base64,{bg_b64}" if bg_b64 else "AI5.jpg"
+bg_url = f"data:image/jpeg;base64,{bg_b64}" if bg_b64 else ""
 
 # =====================================================================
-# EXACT LEFT & RIGHT SIDEBAR CSS CLONING
+# CSS CLONING & CUSTOM STYLING
 # =====================================================================
 css_code = """
     <style>
-    /* Main App Background */
-    .stApp { background: linear-gradient(180deg, #f8f9fa 0%, #ffffff 100%); }
+    /* Safely hide Streamlit's default top menu but keep the sidebar expand icon */
+    header[data-testid="stHeader"] { 
+        background: transparent !important; 
+    }
+    [data-testid="stHeaderActionElements"], #MainMenu, .stDeployButton { 
+        display: none !important; 
+    }[data-testid="collapsedControl"] { 
+        visibility: visible !important; 
+    }
+
+    /* Main App Background - Set to the AI Image for the entire view */
+    .stApp { 
+        background-image: linear-gradient(rgba(249, 249, 249, 0.8), rgba(249, 249, 249, 0.95)), url('REPLACE_ME_BG_IMG') !important;
+        background-size: cover !important;
+        background-position: center !important;
+        background-attachment: fixed !important;
+    }
     html, body, [class*="css"]  { font-family: 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif; }
     
     /* -------------------------------------------------------------
@@ -97,59 +107,18 @@ css_code = """
     [data-testid="stSidebar"] .block-container { padding-top: 1rem !important; }
     
     /* -------------------------------------------------------------
-       TRUE RIGHT SIDEBAR FIX (Applied via injected JS class)
-       ------------------------------------------------------------- */
-    .true-right-sidebar {
-        position: fixed !important;
-        top: 0 !important;
-        right: 0 !important;
-        width: 260px !important;     /* EXACT MATCH to left sidebar */
-        min-width: 260px !important;
-        max-width: 260px !important;
-        height: 100vh !important;
-        
-        /* AI BACKGROUND IMAGE WITH LIGHT OVERLAY FOR READABILITY */
-        background-image: linear-gradient(rgba(249, 249, 249, 0.75), rgba(249, 249, 249, 0.95)), 
-                          url('REPLACE_ME_BG_IMG') !important;
-        background-size: cover !important;
-        background-position: center !important;
-        background-repeat: no-repeat !important;
-
-        border-left: 1px solid #e5e5e5 !important;
-        z-index: 999999 !important;
-        overflow-y: auto !important;
-        overflow-x: hidden !important;
-        
-        /* Mirror internal padding of Left Sidebar */
-        padding-top: 5rem !important; /* Spacing for standard Streamlit top bar */
-        padding-left: 1rem !important;
-        padding-right: 1rem !important;
-        padding-bottom: 2rem !important;
-        
-        box-shadow: -2px 0 5px rgba(0,0,0,0.02) !important;
-    }
-
-    /* Prevent main content from main hiding behind the new right sidebar */
-    .block-container.right-panel-active {
-        padding-right: 280px !important; /* 260px width + 20px padding */
-        transition: padding-right 0.3s ease;
-    }
-
-    /* -------------------------------------------------------------
-       SHARED: EXPANDER & COMPONENT STYLING (Both Sidebars)
+       SHARED: EXPANDER & COMPONENT STYLING 
        ------------------------------------------------------------- */
     /* Expander Base Styling */
-    [data-testid="stSidebar"] [data-testid="stExpander"],
-    .true-right-sidebar [data-testid="stExpander"] {
+    [data-testid="stSidebar"][data-testid="stExpander"] {
         border: none !important;
         box-shadow: none !important;
         background: transparent !important;
         margin-bottom: 2px !important;
     }
     
-    /* STRIP NATIVE EXPANDER BORDERS IN BOTH PANELS */
-    [data-testid="stSidebar"] details,
-    .true-right-sidebar details {
+    /* STRIP NATIVE EXPANDER BORDERS */
+    [data-testid="stSidebar"] details {
         border: none !important;
         background: transparent !important;
         outline: none !important;
@@ -157,30 +126,24 @@ css_code = """
     }
 
     /* STRIP FAINT LEFT LINE ON EXPANDER CONTENT BODY */
-    [data-testid="stSidebar"] [data-testid="stExpanderDetails"],
-    .true-right-sidebar [data-testid="stExpanderDetails"] {
+    [data-testid="stSidebar"] [data-testid="stExpanderDetails"] {
         border: none !important;
         border-left: none !important;
         outline: none !important;
         box-shadow: none !important;
     }
     
-    /* SHARED: Hide Native Arrows */
-    [data-testid="stSidebar"] details summary::-webkit-details-marker,
-    .true-right-sidebar details summary::-webkit-details-marker { 
+    /* Hide Native Arrows */[data-testid="stSidebar"] details summary::-webkit-details-marker { 
         display: none !important; 
     }
-    [data-testid="stSidebar"] details summary,
-    .true-right-sidebar details summary { 
+    [data-testid="stSidebar"] details summary { 
         list-style: none !important; 
     }
     
     /* -------------------------------------------------------------
        EXACT CHEVRON ICON CLASS TARGETING (HOVER & CLICK FIX)
        ------------------------------------------------------------- */
-    /* 1. Ensure the container sits cleanly on the right and holds position */
-    [data-testid="stSidebar"] details summary .st-emotion-cache-1c9yjad.exvv1vr0,
-    .true-right-sidebar details summary .st-emotion-cache-1c9yjad.exvv1vr0 {
+    /* 1. Ensure the container sits cleanly on the right and holds position */[data-testid="stSidebar"] details summary .st-emotion-cache-1c9yjad.exvv1vr0 {
         display: inline-flex !important; 
         align-items: center !important;
         justify-content: center !important;
@@ -188,29 +151,21 @@ css_code = """
         transform: none !important; 
     }
     
-    /* 2. Apply smooth rotation transition directly to the SVG to override Streamlit defaults */
-    [data-testid="stSidebar"] details summary .st-emotion-cache-1c9yjad.exvv1vr0 svg,
-    .true-right-sidebar details summary .st-emotion-cache-1c9yjad.exvv1vr0 svg {
+    /* 2. Apply smooth rotation transition directly to the SVG to override Streamlit defaults */[data-testid="stSidebar"] details summary .st-emotion-cache-1c9yjad.exvv1vr0 svg {
         transition: transform 0.25s ease !important;
     }
 
     /* 3. CLOSED state: Face RIGHT (>). Streamlit's native SVG points DOWN, so we rotate -90deg */
-    [data-testid="stSidebar"] details:not([open]) summary .st-emotion-cache-1c9yjad.exvv1vr0 svg,
-    .true-right-sidebar details:not([open]) summary .st-emotion-cache-1c9yjad.exvv1vr0 svg {
+    [data-testid="stSidebar"] details:not([open]) summary .st-emotion-cache-1c9yjad.exvv1vr0 svg {
         transform: rotate(-90deg) !important; 
     }
     
-    /* 4. OPEN state or HOVER state: Face DOWN (v). Restore to 0deg */
-    [data-testid="stSidebar"] details[open] summary .st-emotion-cache-1c9yjad.exvv1vr0 svg,
-    .true-right-sidebar details[open] summary .st-emotion-cache-1c9yjad.exvv1vr0 svg,
-    [data-testid="stSidebar"] details:hover summary .st-emotion-cache-1c9yjad.exvv1vr0 svg,
-    .true-right-sidebar details:hover summary .st-emotion-cache-1c9yjad.exvv1vr0 svg {
+    /* 4. OPEN state or HOVER state: Face DOWN (v). Restore to 0deg */[data-testid="stSidebar"] details[open] summary .st-emotion-cache-1c9yjad.exvv1vr0 svg,
+    [data-testid="stSidebar"] details:hover summary .st-emotion-cache-1c9yjad.exvv1vr0 svg {
         transform: rotate(0deg) !important; 
     }
     
-    /* SHARED: Expander Summary (Category Headers) */
-    [data-testid="stSidebar"] details summary,
-    .true-right-sidebar details summary {
+    /* Expander Summary (Category Headers) */[data-testid="stSidebar"] details summary {
         padding: 8px 10px !important;
         border-radius: 6px !important;
         font-weight: 600 !important;
@@ -223,23 +178,13 @@ css_code = """
         transition: background-color 0.2s ease, filter 0.2s ease;
         outline: none !important;
     }
-    [data-testid="stSidebar"] details summary:hover,
-    .true-right-sidebar details summary:hover {
+    [data-testid="stSidebar"] details summary:hover {
         background-color: rgba(236, 236, 236, 0.8) !important;
         filter: grayscale(100%) opacity(1); 
     }
 
-    /* MATCH INNER CONTENT PADDING FOR RIGHT PANEL EXPANDERS */
-    .true-right-sidebar [data-testid="stExpanderDetails"] {
-        padding-top: 5px !important;
-        padding-left: 10px !important;
-        padding-right: 10px !important;
-        padding-bottom: 10px !important;
-    }
-
-    /* SHARED: Internal Button Styling (Excluding the Native Toggles) */
-    [data-testid="stSidebar"] .stButton > button:not(.clone-native-toggle),
-    .true-right-sidebar .stButton > button:not(.clone-native-toggle) {
+    /* Internal Button Styling */
+    [data-testid="stSidebar"] .stButton > button {
         border: none !important; background-color: transparent !important;
         color: #333333 !important; text-align: left !important;
         justify-content: flex-start !important; 
@@ -248,93 +193,14 @@ css_code = """
         margin-top: 2px !important; font-weight: 500 !important;
         filter: grayscale(100%) opacity(0.85); 
         transition: background-color 0.2s ease, filter 0.2s ease;
-        padding: 6px 10px 6px 10px !important; 
-    }
-    
-    /* Left Sidebar distinct sub-item indentation */
-    [data-testid="stSidebar"] .stButton > button:not(.clone-native-toggle) {
-        padding-left: 30px !important; 
-    }
-    [data-testid="stSidebar"] .stButton > button:not(.clone-native-toggle):hover,
-    .true-right-sidebar .stButton > button:not(.clone-native-toggle):hover {
+        padding: 6px 10px 6px 30px !important; /* Left Sidebar distinct sub-item indentation */
+    }[data-testid="stSidebar"] .stButton > button:hover {
         background-color: rgba(236, 236, 236, 0.8) !important;
         filter: grayscale(100%) opacity(1); 
     }
 
-    /* Text Inputs internal sizing */
-    [data-testid="stSidebar"] input,
-    .true-right-sidebar input,
-    .true-right-sidebar label,
-    .true-right-sidebar .stSelectbox,
-    .true-right-sidebar p { 
+    /* Text Inputs internal sizing */[data-testid="stSidebar"] input { 
         font-size: 13px !important; 
-    }
-
-    /* George Sankandi Profile - Fixed Bottom, Narrowed */
-    .profile-container {
-        position: fixed; bottom: 15px; left: 10px; width: 240px; 
-        display: flex; align-items: center; gap: 12px; padding: 10px;
-        border-radius: 8px; cursor: pointer; z-index: 100;
-        transition: background 0.2s; background-color: #f9f9f9;
-    }
-    .profile-container:hover { background-color: #ececec; }
-    .profile-avatar { width: 30px; height: 30px; background-color: #d1d5db; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: bold; color: #4b5563;}
-    .profile-name { font-size: 14px; color: #1a1a1a; font-weight: 600;}
-
-    /* -------------------------------------------------------------
-       NATIVE ICON CLONE FOR RIGHT PANEL TOGGLE (Close/Open)
-       ------------------------------------------------------------- */
-    .stButton > button.clone-native-toggle {
-        display: inline-flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        font-weight: 400 !important;
-        padding: 0.25rem !important;
-        border-radius: 0.5rem !important;
-        min-height: 2.2rem !important;
-        max-height: 2.2rem !important;
-        width: 2.2rem !important;
-        max-width: 2.2rem !important;
-        margin: 0px !important;
-        line-height: 1.6 !important;
-        color: inherit !important;
-        opacity: 0.6 !important;
-        background-color: transparent !important;
-        border: none !important;
-        box-shadow: none !important;
-        cursor: pointer !important;
-        transition: background-color 200ms ease 0s, opacity 200ms ease 0s !important;
-    }
-    .stButton > button.clone-native-toggle:hover {
-        background-color: rgba(128, 128, 128, 0.15) !important;
-        opacity: 1 !important;
-    }
-    .stButton > button.clone-native-toggle p {
-        font-size: 1.25rem !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        line-height: 1 !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-    }
-    
-    /* Absolute Floating Container for Close Button (Inside Right Sidebar) */
-    .rp-close-wrapper {
-        position: absolute !important;
-        top: 0.75rem !important;
-        left: 0.5rem !important;
-        width: auto !important;
-        z-index: 1000000 !important;
-    }
-    
-    /* Fixed Floating Container for Open Button (Header of Main View) */
-    .rp-open-wrapper {
-        position: fixed !important;
-        top: 0.75rem !important;
-        right: 4.5rem !important; 
-        width: auto !important;
-        z-index: 1000000 !important;
     }
 
     /* -------------------------------------------------------------
@@ -347,83 +213,73 @@ css_code = """
         border-radius: 8px !important;
         box-shadow: 0 0 8px rgba(255, 105, 180, 0.2) !important;
         transition: all 0.3s ease;
+        background-color: rgba(255, 255, 255, 0.95) !important;
     }
-    .block-container [data-testid="stTextInput"] div[data-baseweb="input"]:focus-within {
+    .block-container[data-testid="stTextInput"] div[data-baseweb="input"]:focus-within {
         border: 2px solid #FF1493 !important; /* Deep Pink Focus */
         box-shadow: 0 0 12px rgba(255, 20, 147, 0.4) !important;
+        background-color: #ffffff !important;
     }
 
-    .root-box { background-color: #ffffff; padding: 20px; border-radius: 10px; border-left: 5px solid #2d3748; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 25px; }
+    /* Container Box Base Styles */
+    .root-box { background-color: #ffffff; padding: 20px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 25px; }
     .root-label { color: #4a5568; font-size: 0.9rem; font-weight: 600; text-transform: uppercase; }
     .root-text { color: #1a202c; font-size: 1.5rem; font-weight: 700; line-height: 1.2; }
-    .metric-box { background-color: #e2e8f0; padding: 10px; border-radius: 5px; font-family: monospace; font-size:0.85rem;}
-    .prediction-box { background-color: #FFF5F5; border-left-color: #C53030; }
+    .metric-box { background-color: rgba(226, 232, 240, 0.9); padding: 10px; border-radius: 5px; font-family: monospace; font-size:0.85rem;}
+    .prediction-box { background-color: #FFF5F5; }
     .prediction-text { color: #9B2C2C !important; }
-    .rescue-box { background-color: #EBF8FF; border-left-color: #2B6CB0; }
+    .rescue-box { background-color: #EBF8FF; }
     .rescue-text { color: #2C5282 !important; }
-    .terminal-container { background-color: #012456; color: #CCCCCC; font-family: 'Consolas', 'Courier New', monospace; padding: 15px; border-radius: 2px; border: 1px solid #000000; white-space: pre-wrap; margin-bottom: 20px; line-height: 1.6; font-size: 0.95rem; box-shadow: 3px 3px 10px rgba(0,0,0,0.3); }
+    .terminal-container { background-color: #012456; color: #CCCCCC; font-family: 'Consolas', 'Courier New', monospace; padding: 15px; border-radius: 2px; white-space: pre-wrap; margin-bottom: 20px; line-height: 1.6; font-size: 0.95rem; }
     .ps-prompt { color: #EEEC7D; font-weight: bold; }
     .ps-text { color: #FFFFFF; }
+
+    /* -------------------------------------------------------------
+       GLOBAL PINK BORDER FOR ALL GENERATED RESULT CONTAINERS
+       ------------------------------------------------------------- */
+    .root-box, 
+    .metric-box, 
+    .terminal-container, 
+    .prediction-box, 
+    .rescue-box,[data-testid="stAlert"],[data-testid="stTable"] {
+        border: 2px solid #FF69B4 !important;
+        box-shadow: 0 0 8px rgba(255, 105, 180, 0.2) !important;
+        border-radius: 8px !important;
+    }
+    
+    /* Specific padding for Streamlit native tables to breathe within the border */
+    [data-testid="stTable"] {
+        padding: 5px !important;
+        background-color: rgba(255, 255, 255, 0.8) !important;
+    }
     </style>
 """
-st.markdown(css_code.replace("REPLACE_ME_BG_IMG", bg_url), unsafe_allow_html=True)
+# Inject CSS and dynamically pass the background image URL
+st.markdown(css_code.replace('REPLACE_ME_BG_IMG', bg_url), unsafe_allow_html=True)
 
 # =====================================================================
-# INVISIBLE JAVASCRIPT FOR UI FUNCTIONALITY & SIDEBAR POSITIONING
+# INVISIBLE JAVASCRIPT FOR UI FUNCTIONALITY
 # =====================================================================
 st.components.v1.html("""
     <script>
     function updateUI() {
         const doc = window.parent.document;
-        
-        // 1. Right Sidebar Positioning Logic
-        const marker = doc.getElementById('right-sidebar-marker');
-        const mainBlock = doc.querySelector('.block-container');
-        
-        if (marker) {
-            const container = marker.closest('[data-testid="stVerticalBlock"]');
-            if (container && !container.classList.contains('true-right-sidebar')) {
-                container.classList.add('true-right-sidebar');
-            }
-            if (mainBlock && !mainBlock.classList.contains('right-panel-active')) {
-                mainBlock.classList.add('right-panel-active');
-            }
-        } else {
-            if (mainBlock && mainBlock.classList.contains('right-panel-active')) {
-                mainBlock.classList.remove('right-panel-active');
+
+        // --- Protect the Banner from the Streamlit Container deletion CSS ---
+        const banner = doc.getElementById('my-custom-banner');
+        if (banner) {
+            const wrapper = banner.closest('.stElementContainer');
+            if (wrapper) {
+                // Move banner completely out of the stElementContainer, placing it directly into the block-container
+                wrapper.parentNode.insertBefore(banner, wrapper);
             }
         }
 
-        // 2. Native Icon Styling Emulation (Targeting Close/Open Right Panel Buttons)
-        const buttons = doc.querySelectorAll('button');
-        buttons.forEach(btn => {
-            const text = btn.innerText.trim();
-            if (text === "❯" || text === "❮") {
-                if (!btn.classList.contains('clone-native-toggle')) {
-                    // Inject Streamlit's native structural classes and our own CSS override class
-                    btn.classList.add('st-emotion-cache-jma0kd', 'est0q595', 'clone-native-toggle');
-                }
-                
-                // Lift to the element container to apply absolute/fixed positioning
-                const elementContainer = btn.closest('.element-container');
-                if (elementContainer) {
-                    if (text === "❯" && !elementContainer.classList.contains('rp-close-wrapper')) {
-                        elementContainer.classList.add('rp-close-wrapper');
-                    }
-                    if (text === "❮" && !elementContainer.classList.contains('rp-open-wrapper')) {
-                        elementContainer.classList.add('rp-open-wrapper');
-                    }
-                }
-            }
-        });
-
-        // 3. Expander Accordion & Hover Capability (UPDATED FOR BOTH PANELS)
-        const expanders = doc.querySelectorAll('[data-testid="stSidebar"] details, .true-right-sidebar details');
+        // Expander Accordion & Hover Capability
+        const expanders = doc.querySelectorAll('[data-testid="stSidebar"] details');
         expanders.forEach(exp => {
             if (!exp.hasAttribute('data-custom-listener')) {
                 exp.setAttribute('data-custom-listener', 'true');
-                
-                const isLeftSidebar = exp.closest('[data-testid="stSidebar"]') !== null;
 
                 // Hover opens it
                 exp.addEventListener('mouseenter', () => {
@@ -438,18 +294,16 @@ st.components.v1.html("""
                     exp.removeAttribute('open');
                 });
                 
-                // Click logic (Accordion applies to BOTH sidebars now)
+                // Click logic
                 const summary = exp.querySelector('summary');
                 if (summary) {
                     summary.addEventListener('click', (e) => {
-                        // Let native click fire, then override state slightly after to ensure smooth CSS mapping
+                        // Let native click fire, then override state slightly after
                         setTimeout(() => {
                             const wasPinned = exp.getAttribute('data-pinned') === 'true';
                             
-                            // Close and unpin all expanders in the SAME sidebar
-                            const containerSelector = isLeftSidebar ? '[data-testid="stSidebar"] details' : '.true-right-sidebar details';
-                            const siblingExps = doc.querySelectorAll(containerSelector);
-                            
+                            // Close and unpin all expanders
+                            const siblingExps = doc.querySelectorAll('[data-testid="stSidebar"] details');
                             siblingExps.forEach(otherExp => {
                                 otherExp.removeAttribute('data-pinned');
                                 if (otherExp !== exp) otherExp.removeAttribute('open');
@@ -492,10 +346,6 @@ with st.sidebar.expander("💻 Codes"):
     term_btn_text = "⌨️ Hide Terminal" if st.session_state.show_terminal else "⌨️ Show Terminal"
     st.button(term_btn_text, on_click=toggle_terminal, use_container_width=True)
 
-with st.sidebar.expander("🎛️ Workspace Layout"):
-    toggle_text = "Right Panel: Close »" if st.session_state.show_right_panel else "Right Panel: Open «"
-    st.button(toggle_text, on_click=toggle_right_panel, use_container_width=True)
-
 with st.sidebar.expander("📁 Projects"):
     new_proj = st.text_input("New project name:", placeholder="Type & press ➕", key="new_proj")
     if st.button("➕ Create Project", use_container_width=True):
@@ -512,12 +362,181 @@ with st.sidebar.expander("📁 Projects"):
 with st.sidebar.expander("💬 Search Chat"):
     st.button("🕒 View Recent Search", on_click=set_page, args=("Search chat",), use_container_width=True)
 
-st.sidebar.markdown("""
-    <div class="profile-container">
-        <div class="profile-avatar">GS</div>
-        <div class="profile-name">George Sankandi</div>
+# -------------------------------------------------------------
+# IDE-STYLED CORE ENGINE LOGIC VIEWER
+# -------------------------------------------------------------
+with st.sidebar.expander("🔬 Diagnostic Workstation", expanded=False):
+    st.markdown("<small style='color:#666; font-weight:600;'>System Architecture Viewer</small>", unsafe_allow_html=True)
+    
+    # MacOS Window style header
+    st.markdown("""
+    <div style="background-color: #212121; padding: 8px 12px; display: flex; align-items: center; border-radius: 6px 6px 0 0; border: 1px solid #333; border-bottom: none; margin-top: 10px;">
+        <div style="width: 10px; height: 10px; background-color: #ff5f56; border-radius: 50%; margin-right: 6px;"></div>
+        <div style="width: 10px; height: 10px; background-color: #ffbd2e; border-radius: 50%; margin-right: 6px;"></div>
+        <div style="width: 10px; height: 10px; background-color: #27c93f; border-radius: 50%; margin-right: 12px;"></div>
+        <span style="color: #a5a5a5; font-size: 11px; font-family: 'Consolas', monospace; letter-spacing: 0.5px;">untitled4.py</span>
     </div>
-""", unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
+    
+    # The exact, entire untitled4.py code 
+    code_snippet = r'''import pandas as pd
+import json
+import glob
+import os
+import re
+
+# =====================================================================
+# HYBRID FEATURE PIPELINE & MORPHOLOGICAL STEMMING SCRIPT
+# Aligns with Sections 6.4, 6.5, and 6.7
+# Prepares the data, establishes empirical frequencies to handle data sparsity, 
+# and builds structural feature mappings.
+# =====================================================================
+
+# 1. Clean up old files to ensure a fresh build
+if os.path.exists('dialects_model.json'):
+    os.remove('dialects_model.json')
+
+# 2. Find and Load CSV
+csv_files = glob.glob("Thesis_Dataset*.csv")
+if not csv_files:
+    print("❌ ERROR: No CSV file found!")
+    exit()
+
+file_path = csv_files[0]
+df = pd.read_csv(file_path)
+df.columns = df.columns.str.strip()
+
+target_dialects =['Aa-ndonga', 'Aa-kwambi', 'Aa-mbalanhu', 'Aa-kwaluudhi', 'Aa-kwanyama', 'Aa-ngandjera', 'Aa-mbandja']
+
+def extract_oshiwambo_root(word):
+    """
+    Objective 1: Morphological Dissection (Section 6.7.1)
+    Stem Oshiwambo words using morphological rules from multiple linguistic sources,
+    including Uushona (2019) on German loanwords.
+    
+    Utilizes a high-fidelity 'Peeling' mechanism by establishing a 
+    descending-order list to prevent partial matching errors.
+    """
+    # Prefixes sorted by length to prevent partial matching errors
+    prefixes = sorted([
+        'omalu', 'omaku', 'otshi', 'otava', 'otaka', 'otashi', 'ohandi', 'okwa', 'omu', 'ova', 
+        'omi', 'oma', 'olu', 'oka', 'oku', 'aba', 'oya', 'ota', 'oo', 'ee', 'oi', 'ou', 
+        'uu', 'aa', 'me', 'ko', 'po', 'mu', 'shi', 'e', 'o', 'a', 'i'
+    ], key=len, reverse=True)
+    
+    # Suffixes sorted by length
+    suffixes = sorted([
+        'ululwa', 'shakati', 'enena', 'inina', 'elela', 'ilila', 'ulula', 'olola', 'onona', 'ununa', 'afana', # Verbal Extensions
+        'mweno', 'kulu', 'gona', # Kinship/Diminutive Suffixes
+        'thana', 'thani', 'elwa', 'elwi', 'thwa', 'thwi', 'elel',
+        'ena', 'eni', 'uka', 'oka', 'wa', 'po', 'ko', 'mo', 'nge', 'ith', 'ik', 'ek', 'el', 'il' # Suffixes
+    ], key=len, reverse=True)
+    
+    stem = str(word).lower().strip()
+    
+    # Infix handling, e.g., omunangeshefa -> omungeshefa
+    if 'nange' in stem:
+        stem = stem.replace('nange', 'nge')
+    
+    # Strip Prefix
+    for pref in prefixes:
+        if stem.startswith(pref) and len(stem) > len(pref) + 2:
+            stem = stem[len(pref):]
+            break
+            
+    # Strip Suffix
+    for suff in suffixes:
+        if stem.endswith(suff) and len(stem) > len(suff) + 1:
+            stem = stem[:-len(suff)]
+            break
+            
+    return stem
+
+def get_cnn_morphological_fingerprints(word):
+    """
+    Objective 2: Spatial Pattern Recognition (CNN) (Section 6.7.2)
+    Generate sub-word feature extractions representing the CNN Layer's n-gram analysis.
+    Applies sliding windows (kernels N=3,4,5) to encode dialect-specific syntactic rules.
+    """
+    sigs = set()
+    root_form = extract_oshiwambo_root(word)
+    
+    for term in[word, root_form]:
+        if len(term) <= 5:
+            sigs.add(term)
+        for n in (3, 4, 5):
+            for i in range(len(term) - n + 1):
+                sigs.add(term[i:i+n])
+    return list(sigs)
+
+# 3. Methodological Performance: Frequency Mapping for Min-Max Scaling
+# Section 6.4: Addresses Dialectal Dominance to ensure high-frequency dialects 
+# do not overwhelm the machine learning process of marginalized ones.
+freq_map = {}
+for _, row in df.iterrows():
+    for dialect in target_dialects:
+        if dialect in df.columns:
+            cell_val = str(row[dialect]).strip()
+            if pd.notna(row[dialect]) and cell_val.lower() != 'nan' and cell_val:
+                word_clean = cell_val.lower()
+                freq_map[word_clean] = freq_map.get(word_clean, 0) + 1
+
+x_min = min(freq_map.values()) if freq_map else 0
+x_max = max(freq_map.values()) if freq_map else 1
+if x_min == x_max:
+    x_max = x_min + 1  
+
+# 4. Build the structured feature index
+dataset =[]
+
+for _, row in df.iterrows():
+    standard_origin = str(row.get('Oshiwambo', 'Unknown')).strip()
+    
+    for dialect in target_dialects:
+        if dialect in df.columns:
+            cell_val = str(row[dialect]).strip()
+            if pd.notna(row[dialect]) and cell_val.lower() != 'nan' and cell_val:
+                word_clean = cell_val.lower()
+                extracted_root = extract_oshiwambo_root(word_clean)
+                
+                x = freq_map.get(word_clean, 0)
+                x_scaled = (x - x_min) / (x_max - x_min)
+                
+                dataset.append({
+                    "word": word_clean,
+                    "extracted_root": extracted_root,
+                    "dialect": dialect,
+                    "root": standard_origin,
+                    "raw_frequency": x,
+                    "scaled_weight": round(x_scaled, 4),
+                    "sig": get_cnn_morphological_fingerprints(word_clean)
+                })
+
+# 5. Save to JSON
+with open('dialects_model.json', 'w', encoding='utf-8') as f:
+    json.dump(dataset, f, ensure_ascii=False)
+
+print(f"🚀 SUCCESS: Empirical Data & NLP Pipeline Complete.")
+print(f"-> Integrated Loanword Phonology (Uushona, 2019) and Proverbial Morphology (Ndume, 2020).")
+print(f"-> Evaluated 5,955 samples across 7 dialects.")
+print(f"-> Dimensionality reduction mapped features to 5,000 dimension limits.")
+print(f"-> Applied CNN Morphological Fingerprints (3, 4, 5 kernels).")
+print(f"-> Normalized Dialectal Distribution via Min-Max Scaling.")'''
+    
+    st.code(code_snippet, language="python")
+    
+    st.markdown("""
+    <style>[data-testid="stSidebar"] [data-testid="stCodeBlock"] {
+        margin-top: -1rem !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stCodeBlock"] pre {
+        border-radius: 0 0 6px 6px !important;
+        border: 1px solid #333 !important;
+        border-top: none !important;
+        background-color: #1e1e1e !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
 
 # =====================================================================
@@ -638,222 +657,28 @@ def simulate_terminal(logs, terminal_placeholder):
         time.sleep(0.35) 
     time.sleep(0.5)
 
-# =========================================================
-# 4. TRUE RIGHT SIDEBAR DEPLOYMENT
-# =========================================================
-if st.session_state.show_right_panel:
-    # A single isolated container transformed into the right sidebar via Javascript
-    with st.container():
-        st.markdown('<div id="right-sidebar-marker"></div>', unsafe_allow_html=True)
-        
-        # Native-styled floating close button
-        st.button("❯", on_click=toggle_right_panel, key="close_rp_btn")
-
-        # -------------------------------------------------------------
-        # RELOCATED HEADERS (Alongside Doubled Namibian Flag & Subheader)
-        # -------------------------------------------------------------
-        st.markdown("<br>", unsafe_allow_html=True) 
-        c_img, c_title = st.columns([0.3, 0.7])
-        with c_img:
-            if os.path.exists("flag.png"):
-                st.image("flag.png", width=70)
-            else:
-                st.warning("flag.png not found")
-                
-        with c_title:
-            st.markdown("<h4 style='margin:0; padding:0; font-size:15px; color:#1a1a1a; line-height:1.2;'>Oshiwambo Hybrid<br>Dialect Classifier</h4>", unsafe_allow_html=True)
-        
-        st.markdown("<div style='font-size: 11.5px; font-weight: 700; color: #4a5568; margin-top: 12px; margin-bottom: 0px; text-transform: uppercase; letter-spacing: 0.2px;'>CNN-LSTM-SVM Multi-Model Feature Fusion</div>", unsafe_allow_html=True)
-        
-        st.markdown("<hr style='margin: 10px 0; border-color: #e5e5e5;'>", unsafe_allow_html=True)
-
-        # -------------------------------------------------------------
-        # IDE-STYLED CORE ENGINE LOGIC VIEWER (Collapsed by Default)
-        # -------------------------------------------------------------
-        with st.expander("🔬 Diagnostic Workstation", expanded=False):
-            st.markdown("<small style='color:#666; font-weight:600;'>System Architecture Viewer</small>", unsafe_allow_html=True)
-            
-            # MacOS Window style header
-            st.markdown("""
-            <div style="background-color: #212121; padding: 8px 12px; display: flex; align-items: center; border-radius: 6px 6px 0 0; border: 1px solid #333; border-bottom: none; margin-top: 10px;">
-                <div style="width: 10px; height: 10px; background-color: #ff5f56; border-radius: 50%; margin-right: 6px;"></div>
-                <div style="width: 10px; height: 10px; background-color: #ffbd2e; border-radius: 50%; margin-right: 6px;"></div>
-                <div style="width: 10px; height: 10px; background-color: #27c93f; border-radius: 50%; margin-right: 12px;"></div>
-                <span style="color: #a5a5a5; font-size: 11px; font-family: 'Consolas', monospace; letter-spacing: 0.5px;">untitled4.py</span>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            # The exact, entire untitled4.py code 
-            code_snippet = r'''import pandas as pd
-import json
-import glob
-import os
-import re
-
-# =====================================================================
-# HYBRID FEATURE PIPELINE & MORPHOLOGICAL STEMMING SCRIPT
-# Aligns with Sections 6.4, 6.5, and 6.7
-# Prepares the data, establishes empirical frequencies to handle data sparsity, 
-# and builds structural feature mappings.
-# =====================================================================
-
-# 1. Clean up old files to ensure a fresh build
-if os.path.exists('dialects_model.json'):
-    os.remove('dialects_model.json')
-
-# 2. Find and Load CSV
-csv_files = glob.glob("Thesis_Dataset*.csv")
-if not csv_files:
-    print("❌ ERROR: No CSV file found!")
-    exit()
-
-file_path = csv_files[0]
-df = pd.read_csv(file_path)
-df.columns = df.columns.str.strip()
-
-target_dialects = ['Aa-ndonga', 'Aa-kwambi', 'Aa-mbalanhu', 'Aa-kwaluudhi', 'Aa-kwanyama', 'Aa-ngandjera', 'Aa-mbandja']
-
-def extract_oshiwambo_root(word):
-    """
-    Objective 1: Morphological Dissection (Section 6.7.1)
-    Stem Oshiwambo words using morphological rules from multiple linguistic sources,
-    including Uushona (2019) on German loanwords.
-    
-    Utilizes a high-fidelity 'Peeling' mechanism by establishing a 
-    descending-order list to prevent partial matching errors.
-    """
-    # Prefixes sorted by length to prevent partial matching errors
-    prefixes = sorted([
-        'omalu', 'omaku', 'otshi', 'otava', 'otaka', 'otashi', 'ohandi', 'okwa', 'omu', 'ova', 
-        'omi', 'oma', 'olu', 'oka', 'oku', 'aba', 'oya', 'ota', 'oo', 'ee', 'oi', 'ou', 
-        'uu', 'aa', 'me', 'ko', 'po', 'mu', 'shi', 'e', 'o', 'a', 'i'
-    ], key=len, reverse=True)
-    
-    # Suffixes sorted by length
-    suffixes = sorted([
-        'ululwa', 'shakati', 'enena', 'inina', 'elela', 'ilila', 'ulula', 'olola', 'onona', 'ununa', 'afana', # Verbal Extensions
-        'mweno', 'kulu', 'gona', # Kinship/Diminutive Suffixes
-        'thana', 'thani', 'elwa', 'elwi', 'thwa', 'thwi', 'elel',
-        'ena', 'eni', 'uka', 'oka', 'wa', 'po', 'ko', 'mo', 'nge', 'ith', 'ik', 'ek', 'el', 'il' # Suffixes
-    ], key=len, reverse=True)
-    
-    stem = str(word).lower().strip()
-    
-    # Infix handling, e.g., omunangeshefa -> omungeshefa
-    if 'nange' in stem:
-        stem = stem.replace('nange', 'nge')
-    
-    # Strip Prefix
-    for pref in prefixes:
-        if stem.startswith(pref) and len(stem) > len(pref) + 2:
-            stem = stem[len(pref):]
-            break
-            
-    # Strip Suffix
-    for suff in suffixes:
-        if stem.endswith(suff) and len(stem) > len(suff) + 1:
-            stem = stem[:-len(suff)]
-            break
-            
-    return stem
-
-def get_cnn_morphological_fingerprints(word):
-    """
-    Objective 2: Spatial Pattern Recognition (CNN) (Section 6.7.2)
-    Generate sub-word feature extractions representing the CNN Layer's n-gram analysis.
-    Applies sliding windows (kernels N=3,4,5) to encode dialect-specific syntactic rules.
-    """
-    sigs = set()
-    root_form = extract_oshiwambo_root(word)
-    
-    for term in [word, root_form]:
-        if len(term) <= 5:
-            sigs.add(term)
-        for n in (3, 4, 5):
-            for i in range(len(term) - n + 1):
-                sigs.add(term[i:i+n])
-    return list(sigs)
-
-# 3. Methodological Performance: Frequency Mapping for Min-Max Scaling
-# Section 6.4: Addresses Dialectal Dominance to ensure high-frequency dialects 
-# do not overwhelm the machine learning process of marginalized ones.
-freq_map = {}
-for _, row in df.iterrows():
-    for dialect in target_dialects:
-        if dialect in df.columns:
-            cell_val = str(row[dialect]).strip()
-            if pd.notna(row[dialect]) and cell_val.lower() != 'nan' and cell_val:
-                word_clean = cell_val.lower()
-                freq_map[word_clean] = freq_map.get(word_clean, 0) + 1
-
-x_min = min(freq_map.values()) if freq_map else 0
-x_max = max(freq_map.values()) if freq_map else 1
-if x_min == x_max:
-    x_max = x_min + 1  
-
-# 4. Build the structured feature index
-dataset = []
-
-for _, row in df.iterrows():
-    standard_origin = str(row.get('Oshiwambo', 'Unknown')).strip()
-    
-    for dialect in target_dialects:
-        if dialect in df.columns:
-            cell_val = str(row[dialect]).strip()
-            if pd.notna(row[dialect]) and cell_val.lower() != 'nan' and cell_val:
-                word_clean = cell_val.lower()
-                extracted_root = extract_oshiwambo_root(word_clean)
-                
-                x = freq_map.get(word_clean, 0)
-                x_scaled = (x - x_min) / (x_max - x_min)
-                
-                dataset.append({
-                    "word": word_clean,
-                    "extracted_root": extracted_root,
-                    "dialect": dialect,
-                    "root": standard_origin,
-                    "raw_frequency": x,
-                    "scaled_weight": round(x_scaled, 4),
-                    "sig": get_cnn_morphological_fingerprints(word_clean)
-                })
-
-# 5. Save to JSON
-with open('dialects_model.json', 'w', encoding='utf-8') as f:
-    json.dump(dataset, f, ensure_ascii=False)
-
-print(f"🚀 SUCCESS: Empirical Data & NLP Pipeline Complete.")
-print(f"-> Integrated Loanword Phonology (Uushona, 2019) and Proverbial Morphology (Ndume, 2020).")
-print(f"-> Evaluated 5,955 samples across 7 dialects.")
-print(f"-> Dimensionality reduction mapped features to 5,000 dimension limits.")
-print(f"-> Applied CNN Morphological Fingerprints (3, 4, 5 kernels).")
-print(f"-> Normalized Dialectal Distribution via Min-Max Scaling.")'''
-            
-            st.code(code_snippet, language="python")
-            
-            # Ensure the code block connects to the header cleanly via CSS targeting the right panel
-            st.markdown("""
-            <style>
-            .true-right-sidebar [data-testid="stCodeBlock"] {
-                margin-top: -1rem !important;
-            }
-            .true-right-sidebar [data-testid="stCodeBlock"] pre {
-                border-radius: 0 0 6px 6px !important;
-                border: 1px solid #333 !important;
-                border-top: none !important;
-                background-color: #1e1e1e !important;
-            }
-            </style>
-            """, unsafe_allow_html=True)
 
 # =========================================================
-# 5. MAIN BODY ROUTING
+# 4. MAIN BODY ROUTING
 # =========================================================
 
 if st.session_state.page == "Diagnostic Tool":
-        
-    # The Expand Panel button (visible only when collapsed; floated top-right via CSS/JS injected classes)
-    if not st.session_state.show_right_panel:
-        st.button("❮", on_click=toggle_right_panel, key="expand_rp_btn_main")
+
+    # --- THE BANNER HEADER (Added ID so JS can move it) ---
+    flag_b64 = get_base64_img("flag.png")
+    flag_img_html = f'<img src="data:image/png;base64,{flag_b64}" width="80" style="margin-bottom: 15px; border-radius: 4px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">' if flag_b64 else '<div style="font-size: 50px; margin-bottom: 10px;">🇳🇦</div>'
+    
+    header_html = f"""
+    <div id="my-custom-banner" style="background-color: none; backdrop-filter: blur(10px); 
+                padding: 40px 20px; border-radius: 12px; text-align: center; 
+                margin-bottom: 30px; border: 1px solid rgba(229, 229, 229, 0.8); 
+                box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
+        {flag_img_html}
+        <h2 style="margin:0; padding:0; font-size:32px; color:#1a1a1a; font-weight: 800; line-height: 1.2;">Oshiwambo Hybrid<br>Dialect Classifier</h2>
+        <div style="font-size: 14px; font-weight: 700; color: #4a5568; margin-top: 12px; text-transform: uppercase; letter-spacing: 1px;">CNN-LSTM-SVM Multi-Model Feature Fusion</div>
+    </div>
+    """
+    st.markdown(header_html, unsafe_allow_html=True)
 
     model = load_model()
     if model:
@@ -932,6 +757,7 @@ if st.session_state.page == "Diagnostic Tool":
                     f"Generated {len(input_sigs)} character-level n-gram signatures.",
                     "Fusing 512 CNN features with 256 LSTM sequential features into 768-dimensional vector...",
                     "Engaging Hybrid Model for evaluation (Validated Mean Accuracy: 82.9%)...",
+                    "Configuring Classification Parameters: 5% Minimum Confidence Threshold...", # <-- Displaying 5% threshold requirement
                     "Executing Signature Matching across 198,432 standardized morphological roots..."
                 ])
                 
@@ -958,7 +784,11 @@ if st.session_state.page == "Diagnostic Tool":
                 st.markdown(f"""<div class="root-box"><div class="root-label">Base Concept Form</div><div class="root-text">{origin}</div></div>""", unsafe_allow_html=True)
                 
                 if "Aa-mbandja" in dialects_found or "Aa-ngandjera" in dialects_found:
-                    st.warning("⚠️ **Borderline Misclassification Risk:** The model notes that geographically overlapping dialects may experience borderline misclassification.")
+                    st.markdown("""
+                        <div style="background-color: rgba(255, 215, 0, 0.15); border: 2px solid #FF69B4; box-shadow: 0 0 8px rgba(255, 105, 180, 0.2); padding: 16px; border-radius: 8px; margin-bottom: 20px;">
+                            <span style="color: #00008B; font-weight: 500; font-size: 14.5px;">⚠️ <b>Borderline Misclassification Risk:</b> The model notes that geographically overlapping dialects may experience borderline misclassification.</span>
+                        </div>
+                    """, unsafe_allow_html=True)
 
                 st.markdown("#### ⚙️ Feature Pipeline Details")
                 c1, c2 = st.columns(2)
@@ -1035,7 +865,11 @@ if st.session_state.page == "Diagnostic Tool":
                         simulate_terminal(terminal_logs_success, terminal_placeholder)
                         
                         st.markdown("#### 🤖 Predictive Classification for Unknown Term")
-                        st.warning(f"The term **'{user_input}'** was not found. Based on morphological similarity to the known word **'{best_fuzzy_match['word']}'** (Confidence: {fuzzy_score:.1%}), the model confidently infers that the unknown word is dictated by {predicted_dialect} grammatical rules:")
+                        st.markdown(f"""
+                            <div style="background-color: rgba(255, 215, 0, 0.15); border: 2px solid #FF69B4; box-shadow: 0 0 8px rgba(255, 105, 180, 0.2); padding: 16px; border-radius: 8px; margin-bottom: 20px;">
+                                <span style="color: #00008B; font-weight: 500; font-size: 14.5px;">⚠️ The term <b>'{user_input}'</b> was not found. Based on morphological similarity to the known word <b>'{best_fuzzy_match['word']}'</b> (Confidence: {fuzzy_score:.1%}), the model confidently infers that the unknown word is dictated by {predicted_dialect} grammatical rules:</span>
+                            </div>
+                        """, unsafe_allow_html=True)
                         
                         st.markdown(f"""
                             <div class="root-box prediction-box">
@@ -1066,7 +900,11 @@ if st.session_state.page == "Diagnostic Tool":
                             simulate_terminal(terminal_logs_rescue, terminal_placeholder)
                             
                             st.markdown("#### 🛠️ Neologism Subword Rescue Protocol")
-                            st.warning(f"The overall confidence score ({fuzzy_score:.1%}) fell below the 5% threshold. However, the system confirmed **'{user_input}'** is a Neologism constructed from multiple modern/shorter subwords. The word has been successfully broken down below:")
+                            st.markdown(f"""
+                                <div style="background-color: rgba(255, 215, 0, 0.15); border: 2px solid #FF69B4; box-shadow: 0 0 8px rgba(255, 105, 180, 0.2); padding: 16px; border-radius: 8px; margin-bottom: 20px;">
+                                    <span style="color: #00008B; font-weight: 500; font-size: 14.5px;">⚠️ The overall confidence score ({fuzzy_score:.1%}) fell below the 5% threshold. However, the system confirmed <b>'{user_input}'</b> is a Neologism constructed from multiple modern/shorter subwords. The word has been successfully broken down below:</span>
+                                </div>
+                            """, unsafe_allow_html=True)
                             
                             v_comp = compound_data['verb_component']
                             v_root = extract_oshiwambo_root(v_comp)
@@ -1123,7 +961,7 @@ if st.session_state.page == "Diagnostic Tool":
                 else:
                     st.error(f"'{user_input}' could not be processed. Please check for typos or try a different term.")
     else:
-        st.error("System configuration error: 'dialects_model.json' not detected. Please run 'processor.py' first.")
+        st.error("System configuration error: 'dialects_model.json' not detected. Please run 'processor.py' or 'untitled4.py' first.")
 
 elif st.session_state.page == "Full Dataset Viewer":
     st.title("◫ Full Dataset Viewer")
