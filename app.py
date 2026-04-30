@@ -278,6 +278,14 @@ st.components.v1.html("""
         const doc = window.parent.document;
 
         // --- Protect the Banner from the Streamlit Container deletion CSS ---
+        // FIX: Remove any cloned/orphaned banners left behind by Streamlit re-renders
+        const allBanners = doc.querySelectorAll('#my-custom-banner');
+        if (allBanners.length > 1) {
+            for (let i = 0; i < allBanners.length - 1; i++) {
+                allBanners[i].remove();
+            }
+        }
+
         const banner = doc.getElementById('my-custom-banner');
         if (banner) {
             const wrapper = banner.closest('.stElementContainer');
