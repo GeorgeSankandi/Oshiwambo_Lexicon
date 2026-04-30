@@ -252,6 +252,18 @@ css_code = """
         padding: 5px !important;
         background-color: rgba(255, 255, 255, 0.8) !important;
     }
+
+    /* --- BROWSER DARK MODE BUG FIX --- 
+       Forces unhighlighted table text/headers to be dark gray so they don't 
+       disappear against the forced white background in dark-mode browsers. */
+    [data-testid="stTable"] th {
+        color: #1a202c !important; 
+        font-weight: bold !important;
+    }
+    [data-testid="stTable"] td {
+        color: #1a202c; /* No !important flag here so Pandas highlighted row can still override this to white */
+    }
+
     </style>
 """
 # Inject CSS and dynamically pass the background image URL
